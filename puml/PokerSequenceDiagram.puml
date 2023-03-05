@@ -1,0 +1,23 @@
+@startuml
+
+' actor Player
+' actor Dealer
+' actor BigBlind
+' actor SmallBlind
+' actor Table
+' actor Deck
+
+PokerGame -> PokerGame : Choose Dealer
+PokerGame -> PokerGame : Shuffle Deck
+PokerGame -> PokerGame : Small Blind
+PokerGame -> PokerGame : Big Blind
+PokerGame -> PokerGame : Deal Players Cards
+PokerGame -> PokerGame : Preflop betting round
+PokerGame -> PokerGame : Deal Flop
+PokerGame -> PokerGame : Flop betting round
+PokerGame -> PokerGame : Deal Turn
+PokerGame -> PokerGame : Turn betting round
+PokerGame -> PokerGame : Deal River
+PokerGame -> PokerGame : River betting round
+PokerGame -> PokerGame : Shutdown
+

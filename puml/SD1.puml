@@ -1,0 +1,210 @@
+@startuml
+
+actor Player1 as P1
+actor Player2 as P2
+actor Player3 as P3
+actor Player4 as P4
+entity PokerGame as PG
+
+autonumber
+== Shuffling Deck [This step is neccesary for shuffiling deck before encryption]==
+
+activate P1
+P1 -> P1 : picks an encryption key A
+loop 52 times
+    P1 -> P1: uses key A to encrypt\neach card of the deck.
+end
+P1 -> P1 : shuffles the cards.
+P1 -> P2 : passes the encrypted and shuffled deck
+deactivate P1
+
+note right
+    With the encryption
+    in place, P2 cannot
+    know which card is which.
+end note
+
+activate P2
+P2 -> P2 : picks an encryption key B
+loop 52 times
+    P2 -> P2 : uses key B to encrypt each card\nof the encrypted and shuffled deck.
+end
+P2 -> P2 : shuffles the cards.
+P2 -> P3 : passes the double encrypted and shuffled deck.
+deactivate P2
+
+activate P3
+P3 -> P3 : picks an encryption key C
+loop 52 times
+    P3 -> P3 : uses key C to encrypt each card\nof the encrypted and shuffled deck.
+end
+P3 -> P3 : shuffles the cards.
+P3 -> P4 : passes the double encrypted and shuffled deck.
+deactivate P3
+
+activate P4
+P4 -> P4 : picks an encryption key D
+loop 52 times
+    P4 -> P4 : uses key D to encrypt each card\nof the encrypted and shuffled deck.
+end
+P4 -> P4 : shuffles the cards.
+P4 -> P1 : passes the double encrypted and shuffled deck back.
+deactivate P4
+
+== Encrypting Suffled Deck [In this step each card is encrypted by all players] ==
+
+activate P1
+loop 52 times
+    P1 -> P1: decrypts each card\nusing her key A.
+end
+
+note right of P1
+    This still leaves
+    others encryption
+    in place though
+    so P1 cannot know
+    which card is which.
+end note
+
+loop 52 times
+    P1 -> P1 : picks one encryption key\nfor each card [A1..A52]
+    P1 -> P1 : encrypts each card\nwith coresponding key
+end
+P1 -> P2 : passes the individually encrypted deck
+deactivate P1
+
+activate P2
+loop 52 times
+    P2 -> P2 : decrypts each card\nusing his key B
+end
+loop 52 times
+    P2 -> P2 : picks one encryption key\nfor each card [B1..B52]
+    P2 -> P2 : encrypts each card\nwith coresponding key
+end
+P2 -> P3 : passes the individually encrypted (by both keys) deck
+deactivate P2
+
+activate P3
+loop 52 times
+    P3 -> P3: decrypts each card\nusing his key C
+end
+loop 52 times
+    P3 -> P3 : picks one encryption key\nfor each card [C1..C52]
+    P3 -> P3 : encrypts each card\nwith coresponding key
+end
+P3 -> P4 : passes the individually encrypted (by both keys) deck
+deactivate P3
+
+
+activate P4
+loop 52 times
+    P4-> P4: decrypts each card\nusing his key D
+end
+loop 52 times
+    P4 -> P4 : picks one encryption key\nfor each card [D1..D52]
+    P4 -> P4 : encrypts each card\nwith coresponding key
+end
+P4 -> P1 : passes the individually encrypted (by all keys) deck
+deactivate P4
+
+activate P1
+P1 -> PG : publishes the deck for everyone playing
+note over PG
+    At this point we have
+    a suffled and encrypted
+    deck indexed from 1..52
+    and all the hashes of
+    coresponding players keys
+end note
+deactivate P1
+
+== Choose Roles (Dealer -> BigBlind -> SmallBlind) using Commit-Reveal Method ==
+
+== Deal Players Cards ==
+group Player1 requests the corresponding keys from the other players in order to see his hand.
+    note over P1
+        Players will pick cards from the deck,
+        identified in which order they are
+        placed in the shuffled deck.
+    end note
+    note over P1
+        1st card is burned.
+        Players receive 2 cards each
+        in a round robin fashion
+    end note
+    P1 -> P2 : Request Keys B2 and B6
+    activate P2
+    P2 -> P2 : Checks that the requesting player\nis entitled to look at the cards.
+    P2 --> P1 : Sends Keys B2 and B6
+    deactivate P2
+    P1 -> P3 : Request Keys C2 and C6
+    activate P3
+    P3 -> P3 : Checks that the requesting player\nis entitled to look at the cards.
+    P3 --> P1 : Sends Keys C2 and C6
+    deactivate P3
+    P1 -> P4 : Request Keys D2 and D2
+    activate P4
+    P4 -> P4 : Checks that the requesting player\nis entitled to look at the cards.
+    P4 --> P1 : Sends Keys D2 and D6
+    deactivate P4
+    activate P1
+    P1 -> P1 : Uses keys reveived to decrypt\nand reveal its cards
+    deactivate P1
+end
+
+ref over P1, P2, P3, P4 : Player2 requests the corresponding keys from the other players in order to see his hand.
+ref over P1, P2, P3, P4 : Player3 requests the corresponding keys from the other players in order to see his hand.
+ref over P1, P2, P3, P4 : Player4 requests the corresponding keys from the other players in order to see his hand.
+
+== Preflop Betting Round ==
+note over P3
+    The first player to act  is the player to the left of the big blind.
+    "under the gun" 
+end note 
+== Deal Flop ==
+ref over P1, P2, P3, P4 
+    Card at index 10 is burned
+    Players exchange keys for cards at indexes 11,12,13
+    Players see the flop
+end ref
+== Flop Betting Round ==
+note over P3
+    The action starts with the first 
+    active player to the left of the dealer
+end note
+== Deal Turn ==
+ref over P1, P2, P3, P4 
+    Card at index 14 is burned
+    Players exchange keys for card at index 15
+    Players see the card at index 15 (Turn)
+end ref 
+== Turn Betting Round ==
+note over P3
+    The action starts with the first 
+    active player to the left of the dealer
+end note
+== Deal River ==
+ref over P1, P2, P3, P4 
+    Card at index 16 is burned
+    Players exchange keys for card at index 17
+    Players see the card at index 17 (River)
+end ref 
+
+== River Betting Round ==
+
+note over P3
+    The action starts with the first 
+    active player to the left of the dealer
+end note
+
+== Shutdown ==
+ref over P1,P2,P3, P4
+    Active players show their hands in clockwise order, 
+    beginning with the player who was the last to bet/raise
+    in the final betting round. 
+    If everyone checked in the final betting round,
+    the first active player to the left of the dealer
+    seat is the first to show.
+end ref
+@enduml
+

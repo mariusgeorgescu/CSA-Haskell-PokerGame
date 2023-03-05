@@ -1,0 +1,34 @@
+@startuml
+
+class Card {
+    value : CardType
+    isRevealed : bool
+}
+
+class Player {
+    isActive : bool
+}
+
+Player <|-- Dealer
+Player <|-- SmallBlind
+Player <|-- BigBlind
+
+
+Deck "1" o-- "..52" Card : contains
+TableCards "1" *-- "0..5" Card : contains >
+Muck "1" *-- "0..*" Hand : fold <
+Muck "1" *-- "0..4" Card : burn <
+Hand "2" *-- "2" Card : made of
+Player "1" *-- "1" Hand : plays >
+
+note bottom of Hand 
+   aka.
+    Hole Cards 
+    or Poket cards 
+endnote
+
+note bottom of TableCards 
+   aka. Community Cards
+endnote
+
+@enduml

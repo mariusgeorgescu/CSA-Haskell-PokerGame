@@ -1,0 +1,83 @@
+@startuml
+
+
+actor Player
+actor Dealer
+actor BigBlind
+actor SmallBlind
+
+package PokerGame {
+Player <|-- Dealer
+Player <|-- SmallBlind
+Player <|-left- BigBlind
+
+Player --> (Bid Action)
+Player --> (View Common Cards)
+Player --> (View Hand)
+(View Hand) ..> (Reveal Hand) : extend 
+(Shutdown) ..> (Reveal Hand) : extend
+
+SmallBlind --> (Cut Deck)
+Dealer --> (Deal Cards) 
+Dealer --> (Shuffle Deck)
+Dealer --> (Shutdown)
+(Shuffle Deck) ..> (Cut Deck) : include
+
+(Deal Cards)  ..>  (Burn Card) : include
+(Deal Cards) <|-- (Deal Common Cards)
+(Deal Cards) <|-- (Deal Player Cards)
+
+(Deal Common Cards) <|-- (Preflop)
+(Deal Common Cards) <|-- (Flop)
+(Deal Common Cards) <|-- (Turn)
+(Deal Common Cards) <|-- (River)
+(Deal Common Cards) ..>  (Burn Card) : include
+(Deal Common Cards) ..>  (Reveal Card) : include
+
+
+(Bid Action) <|-- (Call)
+(Bid Action) <|--(Raise)
+(Bid Action) <|-- (Fold)
+(Bid Action) <|--(Check)
+
+note bottom of (Check)
+    Not avialable
+    in Preflop
+endnote
+
+note bottom of (SmallBlind)
+    Receives 1s card
+    when dealing card
+endnote
+
+
+
+note bottom of (SmallBlind) 
+    The small blind 
+    is generally
+    half the amount 
+    of the big blind
+endnote
+
+note "The first player to act \nis the player to the left\nof the big blind.\naka. under the gun" as N1
+(Bid Action) .. N1
+ N1 .. (Preflop)
+
+note "The action starts with the first\nactive player to the left of the dealer" as N2
+(Flop) .. N2
+(Turn) .. N2
+(River) .. N2
+N2 .. Player
+
+note  "In Preflop, the big blind player\nacts last and is allowed to raise, \neven if the other active players \nhave all called." as N3
+BigBlind .. N3
+N3 .. (Raise)
+
+note "Active players show their hands in clockwise order,\nbeginning with the player who was the last to bet/raise\nin the final betting round.\nIf everyone checked in the final round,the 1st active\nplayer to the left of the dealer is the 1st to show" as N4
+N4 .. Player
+(Reveal Hand) .. N4
+
+
+' }
+
+@enduml

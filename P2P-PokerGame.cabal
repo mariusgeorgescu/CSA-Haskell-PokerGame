@@ -1,0 +1,59 @@
+cabal-version:   3.0
+name:            P2P-PokerGame
+version:         0.1.0.0
+
+-- synopsis:
+-- description:
+license:         GPL-3.0-or-later
+license-file:    LICENSE
+author:          Marius Georgescu
+maintainer:      georgescumarius@live.com
+
+-- copyright:
+category:        Game
+build-type:      Simple
+extra-doc-files: CHANGELOG.md
+
+-- extra-source-files:
+
+common warnings
+  ghc-options: -Wall
+
+library
+  import:           warnings
+  exposed-modules:
+    Cards
+    PokerGame
+    PokerLogic
+
+  -- other-modules:
+  -- other-extensions:
+  build-depends:    base ^>=4.14.3.0
+  hs-source-dirs:   src
+  default-language: Haskell2010
+
+executable P2P-PokerGame
+  import:           warnings
+  main-is:          Main.hs
+
+  -- other-modules:
+  -- other-extensions:
+  build-depends:
+    , base           ^>=4.14.3.0
+    , P2P-PokerGame
+
+  hs-source-dirs:   app
+  default-language: Haskell2010
+
+test-suite P2P-PokerGame-test
+  import:           warnings
+  default-language: Haskell2010
+
+  -- other-modules:
+  -- other-extensions:
+  type:             exitcode-stdio-1.0
+  hs-source-dirs:   test
+  main-is:          Main.hs
+  build-depends:
+    , base           ^>=4.14.3.0
+    , P2P-PokerGame
