@@ -1,6 +1,10 @@
+{-# LANGUAGE InstanceSigs #-}
+
 module PokerGame where
 
-import           Cards (Card, Deck, mkFullDeck)
+import           Cards           (Card, Deck, mkFullDeck)
+import           Data.List       (nub)
+import           Test.QuickCheck (Arbitrary (arbitrary), Gen, vectorOf)
 
 -------------------------------------------------------------------------------
 -- * Declarations
@@ -55,13 +59,22 @@ newtype Hand =
     }
   deriving (Show)
 
+instance Arbitrary Hand where
+  arbitrary :: Gen Hand
+  arbitrary = do
+    cards <- vectorOf 5 (arbitrary :: Gen Card)
+    case mkHand cards of
+      Left s   -> arbitrary
+      Right ha -> return ha
+
 -------------------------------------------------------------------------------
 -- * Utility functions
 -------------------------------------------------------------------------------
 mkHand :: [Card] -> Either String Hand
 mkHand cs
-  | length cs /= 5 = Left "Wrong no. of cards"
-  | otherwise      = Right $ FiveCardDrawHand cs
+  | length cs /= 5       = Left "Wrong no. of cards"
+  | length (nub cs) /= 5 = Left "Hand contains duplicates"
+  | otherwise            = Right $ FiveCardDrawHand cs
 
 mkPokerPlayer :: String -> Int -> PokerPlayer
 mkPokerPlayer = PokerPlayer False Nothing Nothing Nothing Nothing

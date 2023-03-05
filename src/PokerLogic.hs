@@ -31,7 +31,7 @@ data Combination =
     { handRank  :: HandRank
     , structure :: [Rank] -- ^ card ranks that indicate combination strength
     }
-  deriving (Eq, Show) -- Must implement ORD
+  deriving (Eq, Show)
 
 instance Ord Combination where
   compare :: Combination -> Combination -> Ordering
@@ -48,7 +48,7 @@ instance Ord Combination where
 -- * Determine Combinations
 -------------------------------------------------------------------------------
 evaluateHand :: Hand -> Combination
-evaluateHand h = Combination hand_type ranks
+evaluateHand h = Combination hand_type (concat $ fst <$> groups)
   where
     cards          = getHandCards h
     (ranks, suits) = (,) <$> sort . fmap getRank <*> fmap getSuit $ cards
@@ -66,11 +66,11 @@ evaluateHand h = Combination hand_type ranks
           (False, False) -> Highcard
       | no_groups == 4 = OnePair
       | no_groups == 3 =
-        if length (head groups) == 3
+        if snd (head groups) == 3
           then ThreeOfaKind
           else TwoPairs
       | no_groups == 2 =
-        if length (head groups) == 4
+        if snd (head groups) == 4
           then FourOfaKind
           else FullHouse
       | otherwise = error "Invalid Hand"

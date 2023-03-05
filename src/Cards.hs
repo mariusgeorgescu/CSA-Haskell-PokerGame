@@ -1,4 +1,5 @@
-{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs      #-}
 
 module Cards
   ( Suit
@@ -8,6 +9,9 @@ module Cards
   , mkFullDeck
   , rankToInt
   ) where
+
+import           System.Random.Shuffle (shuffle)
+import           Test.QuickCheck       (Arbitrary (arbitrary), Gen, elements)
 
 -------------------------------------------------------------------------------
 -- * Declarations
@@ -46,17 +50,17 @@ data Card =
     { getRank :: !Rank
     , getSuit :: !Suit
     }
-  deriving (Show, Eq)
+  deriving (Eq)
 
 instance Ord Card
  where
   (<=) :: Card -> Card -> Bool
   c1 <= c2 = getRank c1 <= getRank c2
 
+instance Show Card where
+  show :: Card -> String
+  show (Card r s) = show r ++ " of " ++ show s
 
--- instance Show Card where
---   show :: Card -> String
---   show (Card r s) = show r ++ " of " ++ show s
 newtype Deck =
   Deck
     { getCards :: [Card]
@@ -74,3 +78,26 @@ mkFullDeck = Deck [Card r s | r <- [minBound ..], s <- [minBound ..]]
 -------------------------------------------------------------------------------
 rankToInt :: Rank -> Int
 rankToInt r = fromEnum r + 1
+
+-------------------------------------------------------------------------------
+-- * Test functions
+-------------------------------------------------------------------------------
+
+-- | Generate a random `Suit`.
+instance Arbitrary Suit where
+  arbitrary :: Gen Suit
+  arbitrary = elements [minBound :: Suit ..]
+
+
+-- | Generate a random `Rank`.
+instance Arbitrary Rank where
+  arbitrary :: Gen Rank
+  arbitrary = elements [minBound :: Rank ..]
+
+
+-- | Generate a random `Card`.
+instance Arbitrary Card where
+  arbitrary :: Gen Card
+  arbitrary = Card <$> arbitrary <*> arbitrary
+
+
