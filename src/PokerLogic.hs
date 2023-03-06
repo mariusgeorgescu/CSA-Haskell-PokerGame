@@ -5,7 +5,7 @@ module PokerLogic where
 import           Cards         (Card (getRank, getSuit), Rank (..), Suit)
 import           Data.Function (on)
 import           Data.List     (group, sort, sortBy)
-import           PokerGame     (Hand (getHandCards))
+import           PokerGame     (Hand (..))
 
 -------------------------------------------------------------------------------
 -- * Declarations
@@ -91,21 +91,34 @@ groupRanks rs =
 countRanks :: [Rank] -> [Int]
 countRanks rs = snd <$> groupRanks rs
 
-any5consec :: [Rank] -> Bool
-any5consec []         = False
-any5consec list@(x:_) = sort list == take 5 [x ..]
 
+-- | Given a list of ranks, returns True if the list contains unique and consecutive rank values
+isConsecutive :: [Rank] -> Bool
+isConsecutive []         = False
+isConsecutive list@(x:_) = sort list == [x ..]
+
+-------------------------------------------------------------------------------
+-- * Untility functions
+-------------------------------------------------------------------------------
+
+-- | Given a list of ranks, returns True if the list contains exactly 5 ranks which form a Straight
 isStraight :: [Rank] -> Bool
 isStraight [Ace, Ten, Jack, Queen, King] = True
-isStraight ranks                         = any5consec ranks
+isStraight ranks_ = isConsecutive ranks_ && length ranks_ == 5
 
+
+-- | Given a list of suits, returns True if the list contains exactly 5 suits of the same type.
 isFlush :: [Suit] -> Bool
-isFlush suits = all (== head suits) suits
+isFlush suits = all (== head suits) suits && length suits == 5
 
+
+-- | Given a list of cards, returns True if the list contains exactly 5 cards of the same suit which form a StraightFlush.
 isStraightFlush :: [Card] -> Bool
 isStraightFlush cards =
-  isFlush (getSuit <$> cards) && any5consec (getRank <$> cards)
+  isFlush (getSuit <$> cards) && isConsecutive (getRank <$> cards)
 
+
+-- | Given a list of cards, returns True if the list contains exactly 5 cards which form a RoyalFlush.
 isRoyalFlush :: [Card] -> Bool
 isRoyalFlush cards =
   sort (getRank <$> cards) == [Ace, Ten, Jack, Queen, King] &&

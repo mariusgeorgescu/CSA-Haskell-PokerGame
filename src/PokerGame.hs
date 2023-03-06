@@ -1,6 +1,11 @@
 {-# LANGUAGE InstanceSigs #-}
 
-module PokerGame where
+module PokerGame
+  ( mkPokerPlayer
+  , mkHand
+  , startPokerGame
+  , Hand(getHandCards)
+  ) where
 
 import           Cards           (Card, Deck, mkFullDeck)
 import           Data.List       (nub)
@@ -48,6 +53,7 @@ data PokerPlayer =
     , bet        :: Maybe Int
     , lastBet    :: Maybe Int
     , hand       :: Maybe Hand
+    , id         :: Int
     , name       :: String
     , chips      :: Int
     }
@@ -57,42 +63,41 @@ newtype Hand =
   FiveCardDrawHand
     { getHandCards :: [Card]
     }
-  deriving (Show)
-
-instance Arbitrary Hand where
-  arbitrary :: Gen Hand
-  arbitrary = do
-    cards <- vectorOf 5 (arbitrary :: Gen Card)
-    case mkHand cards of
-      Left s   -> arbitrary
-      Right ha -> return ha
+  deriving (Show, Eq)
 
 -------------------------------------------------------------------------------
 -- * Utility functions
 -------------------------------------------------------------------------------
 mkHand :: [Card] -> Either String Hand
-mkHand cs
-  | length cs /= 5       = Left "Wrong no. of cards"
-  | length (nub cs) /= 5 = Left "Hand contains duplicates"
-  | otherwise            = Right $ FiveCardDrawHand cs
+mkHand cards_
+  | length cards_ /= 5       = Left "Wrong no. of cards"
+  | length (nub cards_) /= 5 = Left "Hand contains duplicates"
+  | otherwise                = Right $ FiveCardDrawHand cards_
 
-mkPokerPlayer :: String -> Int -> PokerPlayer
-mkPokerPlayer = PokerPlayer False Nothing Nothing Nothing Nothing
+mkPokerPlayer :: Int -> String -> Int -> Either String PokerPlayer
+mkPokerPlayer id_ name_ chips_
+  | chips_ < 0 = Left "Invalid no. of chips"
+  | id_ < 0    = Left "Invalid ID"
+  | null name_ = Left "Invalid name"
+  | otherwise =
+    Right $ PokerPlayer False Nothing Nothing Nothing Nothing id_ name_ chips_
 
 startPokerGame :: Int -> [PokerPlayer] -> Either String PokerGame
-startPokerGame mb ps
-  | length ps < 2 || length ps > 5 && mb > 0 = Left "Wrong no. of players"
+startPokerGame minBet_ players_
+  | length players_ < 2 || length players_ > 5 = Left "Wrong no. of players"
+  | minBet_ <= 0                               = Left "Invalid minimum bet value"
   | otherwise =
     Right $
     FiveCardDraw
       ChooseDealer
       mkFullDeck
       []
-      (replicate (length ps) 0)
+      (replicate (length players_) 0)
       Nothing
       0
-      mb
-      ps
+      minBet_
+      players_
+
 
 -- setDealer :: Int -> PokerGame -> PokerPlayer
 -- setDealer n game = _
@@ -102,3 +107,13 @@ startPokerGame mb ps
 -- drawNewCard = _
 
 -- discardCard = _
+-------------------------------------------------------------------------------
+-- * Testing utilities
+-------------------------------------------------------------------------------
+instance Arbitrary Hand where
+  arbitrary :: Gen Hand
+  arbitrary = do
+    cards <- vectorOf 5 (arbitrary :: Gen Card)
+    case mkHand cards of
+      Left _   -> arbitrary
+      Right ha -> return ha
