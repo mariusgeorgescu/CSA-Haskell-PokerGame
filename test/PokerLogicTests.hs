@@ -123,15 +123,11 @@ pokerHandCompareTestSuite =
           let h1 = mkHand (["6h", "6c", "3d", "5s", "10h"] :: [Card])
           let h2 = mkHand (["4h", "7c", "8d", "10s", "Qh"] :: [Card])
           compare (evaluateHand <$> h1) (evaluateHand <$> h2) `shouldBe` GT
-
--- Test that two identical high card hands are equal:
--- Input: ["2h", "4d", "7c", "9s", "Jh"], ["2d", "4h", "7s", "9c", "Jd"]
--- Expected output: "Equal"
       describe "Test that two identical high card hands are equal:" $ do
         it
-          "Input: [2h, 4d, 7c, 9s, Jh] vs. [2d, 4h, 7s, 9c, Jd] Expected output: Equal" $ do
-          let h1 = mkHand (["2h", "4d", "7c", "9s", "Jh"] :: [Card])
-          let h2 = mkHand (["2d", "4h", "7s", "9c", "Jd"] :: [Card])
+          "Input: [2h, 4h, 6h, 8h, 10h] vs. [2d, 4d, 6d, 8d, 10d] Expected output: Equal" $ do
+          let h1 = mkHand (["2h", "4h", "6h", "8h", "10h"] :: [Card])
+          let h2 = mkHand (["2d", "4d", "6d", "8d", "10d"] :: [Card])
           compare (evaluateHand <$> h1) (evaluateHand <$> h2) `shouldBe` EQ
       describe "Test that two identical one pair hands are equal:" $ do
         it
@@ -157,91 +153,27 @@ pokerHandCompareTestSuite =
           let h1 = mkHand (["2h", "3c", "4d", "5s", "6h"] :: [Card])
           let h2 = mkHand (["2d", "3s", "4h", "5c", "6d"] :: [Card])
           compare (evaluateHand <$> h1) (evaluateHand <$> h2) `shouldBe` EQ
-      describe "Test that two identical high card hands are equal:" $ do
+      describe "Test that two identical flush hands are equal:" $ do
         it
           "Input: [2h, 4d, 7c, 9s, Jh] vs. [2d, 4h, 7s, 9c, Jd] Expected output: Equal" $ do
           let h1 = mkHand (["2h", "4d", "7c", "9s", "Jh"] :: [Card])
           let h2 = mkHand (["2d", "4h", "7s", "9c", "Jd"] :: [Card])
           compare (evaluateHand <$> h1) (evaluateHand <$> h2) `shouldBe` EQ
-      describe "Test that two identical one pair hands are equal:" $ do
+      describe "Test that two identical full house hands are equal:" $ do
         it
-          "Input: [3h, 3c, 5d, 9s, Jh] vs. [3d, 3s, 5h, 9c, Jd] Expected output: Equal" $ do
-          let h1 = mkHand (["3h", "3c", "5d", "9s", "Jh"] :: [Card])
-          let h2 = mkHand (["3d", "3s", "5h", "9c", "Jd"] :: [Card])
+          "Input: [3h, 3c, 3d, Jh, Js] vs. [3d, 3c, 3s, Jc, Jd] Expected output: Equal" $ do
+          let h1 = mkHand (["3h", "3c", "3d", "Jh", "Js"] :: [Card])
+          let h2 = mkHand (["3d", "3c", "3s", "Jc", "Jd"] :: [Card])
           compare (evaluateHand <$> h1) (evaluateHand <$> h2) `shouldBe` EQ
-      describe "Test that two identical two pair hands are equal:" $ do
+      describe "Test that two identical four of a kind hands are equal:" $ do
         it
-          "Input: [3h, 3c, 5d, 5s, Jh] vs. [3d, 3s, 5h, 5c, Jd] Expected output: Equal" $ do
-          let h1 = mkHand (["3h", "3c", "5d", "5s", "Jh"] :: [Card])
-          let h2 = mkHand (["3d", "3s", "5h", "5c", "Jd"] :: [Card])
+          "Input: [3h, 3c, 3d, 3s, Js] vs. [3d, 3c, 3s, 3h, Jd] Expected output: Equal" $ do
+          let h1 = mkHand (["3h", "3c", "3d", "3h", "Js"] :: [Card])
+          let h2 = mkHand (["3h", "3c", "3d", "3h", "Jd"] :: [Card])
           compare (evaluateHand <$> h1) (evaluateHand <$> h2) `shouldBe` EQ
-      describe "Test that two identical three of a kind hands are equal:" $ do
+      describe "Test that two identical straight flush hands are equal:" $ do
         it
-          "Input: [3h, 3c, 3d, 5s, Jh] vs. [3s, 3d, 3c, 5h, Jd] Expected output: Equal" $ do
-          let h1 = mkHand (["3h", "3c", "3d", "5s", "Jh"] :: [Card])
-          let h2 = mkHand (["3s", "3d", "3c", "5h", "Jd"] :: [Card])
+          "Input: [2h, 3h, 4h, 5h, 6h] vs. [2d, 3d, 4d, 5d, 6d] Expected output: Equal" $ do
+          let h1 = mkHand (["2h", "3h", "4h", "5h", "6h"] :: [Card])
+          let h2 = mkHand (["2d", "3d", "4d", "5d", "6d"] :: [Card])
           compare (evaluateHand <$> h1) (evaluateHand <$> h2) `shouldBe` EQ
-      describe "Test that two identical straight hands are equal:" $ do
-        it
-          "Input: [2h, 3c, 4d, 5s, 6h] vs. [2d, 3s, 4h, 5c, 6d] Expected output: Equal" $ do
-          let h1 = mkHand (["2h", "3c", "4d", "5s", "6h"] :: [Card])
-          let h2 = mkHand (["2d", "3s", "4h", "5c", "6d"] :: [Card])
-          compare (evaluateHand <$> h1) (evaluateHand <$> h2) `shouldBe` EQ
-      describe "Test that two identical high card hands are equal:" $ do
-        it
-          "Input: [2h, 4d, 7c, 9s, Jh] vs. [2d, 4h, 7s, 9c, Jd] Expected output: Equal" $ do
-          let h1 = mkHand (["2h", "4d", "7c", "9s", "Jh"] :: [Card])
-          let h2 = mkHand (["2d", "4h", "7s", "9c", "Jd"] :: [Card])
-          compare (evaluateHand <$> h1) (evaluateHand <$> h2) `shouldBe` EQ
-      describe "Test that two identical one pair hands are equal:" $ do
-        it
-          "Input: [3h, 3c, 5d, 9s, Jh] vs. [3d, 3s, 5h, 9c, Jd] Expected output: Equal" $ do
-          let h1 = mkHand (["3h", "3c", "5d", "9s", "Jh"] :: [Card])
-          let h2 = mkHand (["3d", "3s", "5h", "9c", "Jd"] :: [Card])
-          compare (evaluateHand <$> h1) (evaluateHand <$> h2) `shouldBe` EQ
-      describe "Test that two identical two pair hands are equal:" $ do
-        it
-          "Input: [3h, 3c, 5d, 5s, Jh] vs. [3d, 3s, 5h, 5c, Jd] Expected output: Equal" $ do
-          let h1 = mkHand (["3h", "3c", "5d", "5s", "Jh"] :: [Card])
-          let h2 = mkHand (["3d", "3s", "5h", "5c", "Jd"] :: [Card])
-          compare (evaluateHand <$> h1) (evaluateHand <$> h2) `shouldBe` EQ
-      describe "Test that two identical three of a kind hands are equal:" $ do
-        it
-          "Input: [3h, 3c, 3d, 5s, Jh] vs. [3s, 3d, 3c, 5h, Jd] Expected output: Equal" $ do
-          let h1 = mkHand (["3h", "3c", "3d", "5s", "Jh"] :: [Card])
-          let h2 = mkHand (["3s", "3d", "3c", "5h", "Jd"] :: [Card])
-          compare (evaluateHand <$> h1) (evaluateHand <$> h2) `shouldBe` EQ
-      describe "Test that two identical straight hands are equal:" $ do
-        it
-          "Input: [2h, 3c, 4d, 5s, 6h] vs. [2d, 3s, 4h, 5c, 6d] Expected output: Equal" $ do
-          let h1 = mkHand (["2h", "3c", "4d", "5s", "6h"] :: [Card])
-          let h2 = mkHand (["2d", "3s", "4h", "5c", "6d"] :: [Card])
-          compare (evaluateHand <$> h1) (evaluateHand <$> h2) `shouldBe` EQ
-
--- Test that two identical one pair hands are equal:
--- Input: ["3h", "3c", "5d", "9s", "Jh"], ["3d", "3s", "5h", "9c", "Jd"]
--- Expected output: "Equal"
--- Test that two identical two pair hands are equal:
--- Input: ["3h", "3c", "5d", "5s", "Jh"], ["3d", "3s", "5h", "5c", "Jd"]
--- Expected output: "Equal"
--- Test that two identical three of a kind hands are equal:
--- Input: ["3h", "3c", "3d", "5s", "Jh"], ["3s", "3d", "3c", "5h", "Jd"]
--- Expected output: "Equal"
--- Test that two identical straight hands are equal:
--- Input: ["2h", "3c", "4d", "5s", "6h"], ["2d", "3s", "4h", "5c", "6d"]
--- Expected output: "Equal"
--- Test that two identical flush hands are equal:
--- Input: ["2h", "4h", "6h", "8h", "10h"], ["2d", "4d", "6d", "8d", "10d"]
--- Expected output: "Equal"
--- Test that two identical full house hands are equal:
--- Input: ["3h", "3c", "3d", "Jh", "Js"], ["3s", "3d", "3c", "Jd", "Jc"]
--- Expected output: "Equal"
--- Test that two identical four of a kind hands are equal:
--- Input: ["3h", "3c", "3d", "3s", "Jh"], ["3d", "3c", "3s", "3h", "Jd"]
--- Expected output: "Equal"
--- Test that two identical straight flush hands are equal:
--- Input: ["2h", "3h", "4h", "5h", "6h"], ["2d", "3d", "4d", "5d", "6d"]
--- Expected output: "Equal"
--- Test that a hand with all identical cards is a valid hand:
--- Input: ["3h", "3h", "3h", "3h", "3h"], ["2d", "2d", "2d", "2d", "2d"]
--- Expected output: "Invalid Hand"
