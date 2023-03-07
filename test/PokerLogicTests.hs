@@ -91,12 +91,17 @@ pokerHandCompareTestSuite =
           let h1 = mkHand (["Ks", "Kc", "Kd", "8h", "8s"] :: [Card])
           let h2 = mkHand (["Qs", "Qc", "Qd", "Js", "Jc"] :: [Card])
           compare (evaluateHand <$> h1) (evaluateHand <$> h2) `shouldBe` GT
+      describe
+        "Test that a flush beats a straight:" $ do
+        it
+          "Input: [2s, 7s, 9s, Js, Qs] vs. [2s, 3c, 4d, 5h, 6s] Expected output: First Hand Wins" $ do
+          let h1 = mkHand (["2s", "7s", "9s", "Js", "Qs"] :: [Card])
+          let h2 = mkHand (["2s", "3c", "4d", "5h", "6s"] :: [Card])
+          compare (evaluateHand <$> h1) (evaluateHand <$> h2) `shouldBe` GT
 
 
 
--- Test that a flush beats a straight:
--- Input: ["2s", "7s", "9s", "Js", "Qs"], ["2s", "3c", "4d", "5h", "6s"]
--- Expected output: "First Hand Wins"
+
 -- Test that two flushes with different high cards are compared correctly:
 -- Input: ["2s", "7s", "9s", "Js", "Qs"], ["3s", "8s", "10s", "Js", "Qs"]
 -- Expected output: "Second Hand Wins"
