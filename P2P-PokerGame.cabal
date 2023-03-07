@@ -53,8 +53,8 @@ executable P2P-PokerGame
 test-suite P2P-PokerGame-test
   import:           warnings
   default-language: Haskell2010
+  other-modules:    PokerLogicTests
 
-  -- other-modules:
   -- other-extensions:
   type:             exitcode-stdio-1.0
   hs-source-dirs:   test

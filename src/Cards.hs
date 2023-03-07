@@ -52,6 +52,7 @@ data Rank
   deriving (Show, Eq, Ord, Enum, Bounded)
 
 
+
 -- | Card type.
 data Card =
   Card

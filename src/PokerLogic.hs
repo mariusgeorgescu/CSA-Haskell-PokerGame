@@ -95,7 +95,7 @@ countRanks rs = snd <$> groupRanks rs
 -- | Given a list of ranks, returns True if the list contains unique and consecutive rank values
 isConsecutive :: [Rank] -> Bool
 isConsecutive []         = False
-isConsecutive list@(x:_) = sort list == [x ..]
+isConsecutive list@(x:_) = sort list == take 5 [x ..]
 
 -------------------------------------------------------------------------------
 -- * Untility functions

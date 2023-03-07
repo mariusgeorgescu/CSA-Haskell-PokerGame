@@ -9,6 +9,8 @@ import           Cards           (Deck (getCards), intToRank, mkFullDeck,
 import           Data.List       (nub)
 
 import           PokerGame
+
+import           PokerLogicTests (pokerHandEvaluateTestSuite, pokerHandCompareTestSuite)
 import           Test.Hspec
 import           Test.QuickCheck
 
@@ -45,6 +47,5 @@ main = do
           property $ \h -> length (getHandCards h) `shouldBe` (5 :: Int)
         it "should not contain duplicates" $
           property $ \h -> nub (getHandCards h) `shouldBe` getHandCards h
-
-
-
+  pokerHandEvaluateTestSuite
+  pokerHandCompareTestSuite
