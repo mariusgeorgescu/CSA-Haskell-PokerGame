@@ -1,14 +1,20 @@
-{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE InstanceSigs   #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module PokerGame
   ( mkPokerPlayer
   , mkHand
   , startPokerGame
   , Hand(getHandCards)
+  , setDealer
+  , dealHands
+  , PokerGame
   ) where
 
-import           Cards           (Card, Deck, mkFullDeck)
+import           Cards           (Card, Deck, drawCards, mkFullDeck)
 import           Data.List       (nub)
+
+import           Data.List.Extra (groupSort)
 import           Test.QuickCheck (Arbitrary (arbitrary), Gen, vectorOf)
 
 -------------------------------------------------------------------------------
@@ -31,7 +37,7 @@ data GameState
   | SecondBetRound -- ^ After the drawing round, another round of betting begins, with the same options as before: fold, call, or raise
   | Showdown -- ^ If more than one player is still in the hand after the second round of betting, a showdown occurs, where the players reveal their cards and the best hand wins the pot.
   | EndOfHand -- ^ After the pot has been awarded, the next hand begins, with the player to the left of the previous dealer becoming the new dealer.
-  deriving (Show, Enum)
+  deriving (Show, Enum, Eq)
 
 data PokerGame =
   FiveCardDraw
@@ -40,7 +46,7 @@ data PokerGame =
     , muck            :: [Card]
     , bets            :: [Int]
     , dealerIndex     :: Maybe Int
-    , playerTurnIndex :: Int
+    , playerTurnIndex :: Maybe Int
     , minBet          :: Int
     , players         :: [PokerPlayer]
     }
@@ -53,11 +59,20 @@ data PokerPlayer =
     , bet        :: Maybe Int
     , lastBet    :: Maybe Int
     , hand       :: Maybe Hand
-    , id         :: Int
+    , identity   :: Int
     , name       :: String
     , chips      :: Int
     }
   deriving (Show)
+
+instance Eq PokerPlayer
+ where
+  (==) :: PokerPlayer -> PokerPlayer -> Bool
+  (==) p1 p2 = identity p1 == identity p2
+
+instance Ord PokerPlayer where
+  compare :: PokerPlayer -> PokerPlayer -> Ordering
+  compare p1 p2 = compare (identity p1) (identity p2)
 
 newtype Hand =
   FiveCardDrawHand
@@ -66,7 +81,7 @@ newtype Hand =
   deriving (Show, Eq)
 
 -------------------------------------------------------------------------------
--- * Utility functions
+-- * Constructors
 -------------------------------------------------------------------------------
 mkHand :: [Card] -> Either String Hand
 mkHand cards_
@@ -94,13 +109,51 @@ startPokerGame minBet_ players_
       []
       (replicate (length players_) 0)
       Nothing
-      0
+      Nothing
       minBet_
       players_
 
+-------------------------------------------------------------------------------
+-- * Game Logic Functions
+-------------------------------------------------------------------------------
+setDealer :: Int -> PokerGame -> Either String PokerGame
+setDealer n game@FiveCardDraw {state}
+  | state /= ChooseDealer = Left "Wrong game state"
+  | n < 0                 = Left "Wrong dealer index"
+  | otherwise =
+    Right $
+    game
+      { dealerIndex = Just n
+      , playerTurnIndex = Just (n + 1)
+      , state = DealingHands
+      }
 
--- setDealer :: Int -> PokerGame -> PokerPlayer
--- setDealer n game = _
+dealHands :: PokerGame -> Either String PokerGame
+dealHands game@FiveCardDraw {state, deck, players}
+  | state /= DealingHands = Left "Invalid game state for dealing hands"
+  | otherwise             = do
+    let no_of_cards_to_deal = length players * 5
+    (cards_to_deal, newDeck) <- drawCards no_of_cards_to_deal deck
+    let deal = groupSort (zip (cycle players) cards_to_deal) -- deal in round robin fashion
+    updatedPlayers <- traverse (uncurry dealHandToPlayer) deal
+    return $
+      game {state = FirstBetRound, deck = newDeck, players = updatedPlayers}
+
+dealHandToPlayer :: PokerPlayer -> [Card] -> Either String PokerPlayer
+dealHandToPlayer player_ cards_ = do
+  h <- mkHand cards_
+  return $ player_ {hand = Just h}
+
+discardAndDraw :: Int -> Int -> PokerGame -> Either String PokerGame
+discardAndDraw pid no_discard game@FiveCardDraw {state, players}
+  | state /= Drawing                 = Left "Invalid state for drawing"
+  | no_discard < 0                   = Left "Invalid no of cards to discard"
+  | not (isPlayerInGame pid players) = Left "Invalid player id"
+  | otherwise                        = Right game -- TODO
+
+isPlayerInGame :: Int -> [PokerPlayer] -> Bool
+isPlayerInGame i pls = i `elem` (identity <$> pls)
+
 
 -- placeBet = _
 

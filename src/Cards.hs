@@ -12,11 +12,11 @@ module Cards
   , shuffleDeckR
   , shuffleDeck
   , intToRank
+  , drawCards
   ) where
 
 import           Control.Monad.IO.Class (MonadIO)
 import           Data.String            (IsString (fromString))
-import           GHC.StaticPtr          (IsStatic)
 import           System.Random          (newStdGen)
 import           System.Random.Shuffle  as SRS (shuffle, shuffle')
 import           Test.QuickCheck        (Arbitrary (arbitrary), Gen, elements)
@@ -50,7 +50,6 @@ data Rank
   | Queen
   | King
   deriving (Show, Eq, Ord, Enum, Bounded)
-
 
 
 -- | Card type.
@@ -112,6 +111,11 @@ shuffleDeck permutations (Deck cards)
 shuffleDeckR :: MonadIO m => Deck -> m Deck
 shuffleDeckR (Deck cards) = do
   Deck . SRS.shuffle' cards (length cards) <$> newStdGen
+
+drawCards :: Int -> Deck -> Either String ([Card], Deck)
+drawCards n (Deck cards)
+  | n > 0     = Right (take n cards, Deck (drop n cards))
+  | otherwise = Left "No. of cards to draw must be positive"
 
 -------------------------------------------------------------------------------
 -- * Utility functions
