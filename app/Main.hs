@@ -1,18 +1,42 @@
 module Main where
 
-import           Control.Monad.IO.Class (MonadIO (liftIO))
-import PokerGame (mkPokerPlayer, startPokerGame, setDealer, dealHands, PokerGame)
+import           PokerGame     (PokerGame, addPlayerToGame, dealHands,
+                                initPokerGame, setDealer, startPokerGame)
 
-testRun :: Either String PokerGame
-testRun = do
-  player1 <- mkPokerPlayer 1 "marius" 100
-  player2 <- mkPokerPlayer 2 "andrei" 100
-  game <- startPokerGame 10 [player1, player2]
-  game1 <- setDealer 1 game
-  game2 <- dealHands game1
-  return game2
+import           System.Random (Random (randomR), RandomGen, newStdGen)
+
+testRun2 :: [Int] -> Either String PokerGame
+testRun2 perms =
+  initPokerGame perms 10 >>= addPlayerToGame "Marius" 100 >>=
+  addPlayerToGame "Andrei" 100 >>=
+  startPokerGame >>=
+  setDealer 1 >>=
+  dealHands
+
+initPlayer :: IO (String, Int)
+initPlayer = do
+  print "Enter your name: "
+  name <- getLine
+  print "Enter your chips: "
+  chips <- getLine
+  return (name, read chips)
+
+randomList :: RandomGen g => g -> Int -> [Int]
+randomList gen n = go gen [0 .. n - 1]
+  where
+    go _ [] = []
+    go g (x:xs) =
+      let (r, g') = randomR (0, n - x - 1) g
+       in r : go g' xs
 
 main :: IO ()
 main = do
   putStrLn "Hello, Haskell Poker Game!"
-  print testRun
+  gen <- newStdGen
+  let permutations = randomList gen 51
+  print permutations
+  print (length permutations)
+  case testRun2 permutations of
+    Left s -> print s
+    Right pg -> do
+      print pg

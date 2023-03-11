@@ -31,7 +31,7 @@ data Suit
   | Hearts
   | Diamonds
   | Clubs
-  deriving (Show, Eq, Enum, Bounded)
+  deriving (Eq, Enum, Bounded)
 
 
 -- | Card ranks.
@@ -49,7 +49,7 @@ data Rank
   | Jack
   | Queen
   | King
-  deriving (Show, Eq, Ord, Enum, Bounded)
+  deriving (Eq, Ord, Enum, Bounded)
 
 
 -- | Card type.
@@ -66,11 +66,28 @@ newtype Deck =
   Deck
     { getCards :: [Card]
     }
-  deriving (Show, Eq)
+  deriving (Eq)
 
 -------------------------------------------------------------------------------
 -- * Instances
 -------------------------------------------------------------------------------
+instance Show Suit where
+  show :: Suit -> String
+  show Spades   = "\x2660"
+  show Hearts   = "\x1b[31m\x2665\x1b[0m"
+  show Diamonds = "\x1b[31m\x2666\x1b[0m"
+  show Clubs    = "\x2663"
+
+instance Show Rank where
+  show :: Rank -> String
+  show r =
+    case r of
+      Ace   -> "A"
+      King  -> "K"
+      Queen -> "Q"
+      Jack  -> "J"
+      _     -> show . rankToInt $ r
+
 instance IsString Rank where
   fromString :: String -> Rank
   fromString str =
@@ -88,7 +105,7 @@ instance Ord Card
 
 instance Show Card where
   show :: Card -> String
-  show (Card r s) = show r ++ " of " ++ show s
+  show (Card r s) = show r ++ show s ++ "  "
 
 instance IsString Card where
   fromString :: String -> Card
@@ -96,6 +113,10 @@ instance IsString Card where
     let s = last str
         r = init str
      in Card (fromString r) (charToSuit s)
+
+instance Show Deck where
+  show :: Deck -> String
+  show (Deck cards) = show cards
 
 -------------------------------------------------------------------------------
 -- * Deck operation functions
