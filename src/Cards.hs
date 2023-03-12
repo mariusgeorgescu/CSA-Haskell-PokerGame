@@ -2,20 +2,10 @@
 {-# LANGUAGE InstanceSigs      #-}
 {-# LANGUAGE LambdaCase        #-}
 
-module Cards
-  ( Suit
-  , Rank(..)
-  , Card(getRank, getSuit)
-  , Deck(getCards)
-  , mkFullDeck
-  , rankToInt
-  , shuffleDeckR
-  , shuffleDeck
-  , intToRank
-  , drawCards
-  ) where
+module Cards where
 
 import           Control.Monad.IO.Class (MonadIO)
+import           Data.Function          (on)
 import           Data.String            (IsString (fromString))
 import           System.Random          (newStdGen)
 import           System.Random.Shuffle  as SRS (shuffle, shuffle')
@@ -55,8 +45,8 @@ data Rank
 -- | Card type.
 data Card =
   Card
-    { getRank :: !Rank
-    , getSuit :: !Suit
+    { cardRank :: !Rank
+    , cardSuit :: !Suit
     }
   deriving (Eq)
 
@@ -64,12 +54,12 @@ data Card =
 -- | Deck type.
 newtype Deck =
   Deck
-    { getCards :: [Card]
+    { deckCards :: [Card]
     }
   deriving (Eq)
 
 -------------------------------------------------------------------------------
--- * Instances
+--  Instances
 -------------------------------------------------------------------------------
 instance Show Suit where
   show :: Suit -> String
@@ -98,71 +88,25 @@ instance IsString Rank where
       "J" -> Jack
       _   -> intToRank (read str)
 
-instance Ord Card
- where
-  (<=) :: Card -> Card -> Bool
-  c1 <= c2 = getRank c1 <= getRank c2
+instance Ord Card where
+  compare :: Card -> Card -> Ordering
+  compare = compare `on` cardRank
 
 instance Show Card where
   show :: Card -> String
-  show (Card r s) = show r ++ show s ++ "  "
+  show (Card rank suit) = show rank ++ show suit ++ "  "
 
 instance IsString Card where
   fromString :: String -> Card
-  fromString str =
-    let s = last str
-        r = init str
-     in Card (fromString r) (charToSuit s)
+  fromString string =
+    let suit = last string
+        rank = init string
+     in Card (fromString rank) (unsafeCharToSuit suit)
 
 instance Show Deck where
   show :: Deck -> String
-  show (Deck cards) = show cards
+  show = show . deckCards
 
--------------------------------------------------------------------------------
--- * Deck operation functions
--------------------------------------------------------------------------------
-mkFullDeck :: Deck
-mkFullDeck = Deck [Card r s | r <- [minBound ..], s <- [minBound ..]]
-
-shuffleDeck :: [Int] -> Deck -> Either String Deck
-shuffleDeck permutations (Deck cards)
-  | length permutations == 51 = Right $ Deck $ SRS.shuffle cards permutations
-  | otherwise                 = Left "Invalid permutations"
-
-shuffleDeckR :: MonadIO m => Deck -> m Deck
-shuffleDeckR (Deck cards) = do
-  Deck . SRS.shuffle' cards (length cards) <$> newStdGen
-
-drawCards :: Int -> Deck -> Either String ([Card], Deck)
-drawCards n (Deck cards)
-  | n > 0     = Right (take n cards, Deck (drop n cards))
-  | otherwise = Left "No. of cards to draw must be positive"
-
--------------------------------------------------------------------------------
--- * Utility functions
--------------------------------------------------------------------------------
-rankToInt :: Rank -> Int
-rankToInt r = fromEnum r + 1
-
-intToRank :: Int -> Rank
-intToRank i
-  | i <= 13 && i >= 1 = toEnum $ i - 1
-  | otherwise         = error "value must be between 1 and 13 "
-
-
--- | Converts char to suit
-charToSuit :: Char -> Suit
-charToSuit =
-  \case
-    'h' -> Hearts
-    'c' -> Clubs
-    'd' -> Diamonds
-    's' -> Spades
-    _   -> error "wrong char"
-
--------------------------------------------------------------------------------
--- * Testing utilities
--------------------------------------------------------------------------------
 
 -- | Generate a random `Suit`.
 instance Arbitrary Suit where
@@ -180,3 +124,55 @@ instance Arbitrary Rank where
 instance Arbitrary Card where
   arbitrary :: Gen Card
   arbitrary = Card <$> arbitrary <*> arbitrary
+
+-------------------------------------------------------------------------------
+-- * Functions on Deck
+-------------------------------------------------------------------------------
+
+-- | Function to build a full deck of cards
+mkFullDeck :: Deck
+mkFullDeck = Deck [Card r s | r <- [minBound ..], s <- [minBound ..]]
+
+
+-- | Given a list of permutations this function return a shuffled deck.
+shuffleDeck :: [Int] -> Deck -> Either String Deck
+shuffleDeck permutations (Deck cards)
+  | length permutations == 51 = Right $ Deck $ SRS.shuffle cards permutations
+  | otherwise                 = Left "Invalid permutations"
+
+
+-- | This function return a shuffled deck using newStdGen
+shuffleDeckR :: MonadIO m => Deck -> m Deck
+shuffleDeckR (Deck cards) = do
+  Deck . SRS.shuffle' cards (length cards) <$> newStdGen
+
+{- | Function to draw cards from a deck of cards
+ Returns the first n cards and the updated deck-}
+drawCards :: Int -> Deck -> Either String ([Card], Deck)
+drawCards n (Deck cards)
+  | n > 0     = Right (take n cards, Deck (drop n cards))
+  | otherwise = Left "No. of cards to draw must be positive"
+
+-------------------------------------------------------------------------------
+-- * Utility functions
+-------------------------------------------------------------------------------
+
+-- | Converts Rank to Int (Ace == 1)
+rankToInt :: Rank -> Int
+rankToInt r = fromEnum r + 1
+
+
+-- | Converts Int to Rank (1 == Ace)
+intToRank :: Int -> Rank
+intToRank i = toEnum $ (i - 1) `mod` 13
+
+
+-- | Converts char to suit
+unsafeCharToSuit :: Char -> Suit
+unsafeCharToSuit =
+  \case
+    'h' -> Hearts
+    'c' -> Clubs
+    'd' -> Diamonds
+    's' -> Spades
+    _   -> error "wrong char"

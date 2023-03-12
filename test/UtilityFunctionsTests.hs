@@ -1,6 +1,6 @@
 module UtilityFunctionsTests where
 
-import           Cards           (Deck (getCards), intToRank, mkFullDeck,
+import           Cards           (Deck (deckCards), intToRank, mkFullDeck,
                                   rankToInt, shuffleDeckR)
 import           Data.List       (nub)
 
@@ -20,16 +20,16 @@ propertyTestsSuite =
     describe "Deck" $ do
       let deck = mkFullDeck
       context "When created" $ do
-        it "should contain 52 cards" $ do length (getCards deck) `shouldBe` 52
+        it "should contain 52 cards" $ do length (deckCards deck) `shouldBe` 52
         it "should not contain duplicates" $ do
-          nub (getCards deck) `shouldBe` getCards deck
+          nub (deckCards deck) `shouldBe` deckCards deck
       context "When shuffled" $ do
         it "should not contain duplicates" $ do
           shuffled <- shuffleDeckR deck
-          nub (getCards shuffled) `shouldBe` getCards shuffled
+          nub (deckCards shuffled) `shouldBe` deckCards shuffled
         it "length must be preserved" $ do
           shuffled <- shuffleDeckR deck
-          length (getCards shuffled) `shouldBe` 52
+          length (deckCards shuffled) `shouldBe` 52
     describe "Hand" $ do
       context "When created" $ do
         it "should show an error if no. of cards is different than 5" $
@@ -39,6 +39,6 @@ propertyTestsSuite =
               cards <- generate $ vectorOf n arbitrary
               isLeft (mkHand cards) `shouldBe` True
         it "should contain 5 cards" $
-          property $ \h -> length (getHandCards h) `shouldBe` (5 :: Int)
+          property $ \h -> length (handCards h) `shouldBe` (5 :: Int)
         it "should not contain duplicates" $
-          property $ \h -> nub (getHandCards h) `shouldBe` getHandCards h
+          property $ \h -> nub (handCards h) `shouldBe` handCards h

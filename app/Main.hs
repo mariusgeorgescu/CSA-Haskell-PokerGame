@@ -3,6 +3,7 @@ module Main where
 import           PokerGame     (PokerGame, addPlayerToGame, dealHands,
                                 initPokerGame, setDealer, startPokerGame)
 
+import           PokerGameApp  (runPokerApp, testPokerApp, Env (Env))
 import           System.Random (Random (randomR), RandomGen, newStdGen)
 
 testRun2 :: [Int] -> Either String PokerGame
@@ -12,14 +13,6 @@ testRun2 perms =
   startPokerGame >>=
   setDealer 1 >>=
   dealHands
-
-initPlayer :: IO (String, Int)
-initPlayer = do
-  print "Enter your name: "
-  name <- getLine
-  print "Enter your chips: "
-  chips <- getLine
-  return (name, read chips)
 
 randomList :: RandomGen g => g -> Int -> [Int]
 randomList gen n = go gen [0 .. n - 1]
@@ -33,10 +26,6 @@ main :: IO ()
 main = do
   putStrLn "Hello, Haskell Poker Game!"
   gen <- newStdGen
-  let permutations = randomList gen 51
-  print permutations
-  print (length permutations)
-  case testRun2 permutations of
-    Left s -> print s
-    Right pg -> do
-      print pg
+  let perms = randomList gen 51
+  let g = initPokerGame perms 10
+  either print (flip (runPokerApp (Env 1)) testPokerApp) g

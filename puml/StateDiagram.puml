@@ -1,0 +1,41 @@
+@startuml
+top to bottom direction
+
+
+[*] --> NotStarted : Start
+
+
+NotStarted --> NotStarted : Init game\n params
+NotStarted --> NotStarted : Add player
+NotStarted --> NotStarted : Remove player
+
+NotStarted --> DealerSelection : [no. of players between 2 and 5]
+
+
+
+DealerSelection --> DealerSelection : Player "vote"
+DealerSelection --> PostingBlinds : All players voted
+
+PostingBlinds  --> PostingBlinds : Place bet
+PostingBlinds  --> DealingHands : Blind bets placed
+
+DealingHands --> DealingHands : Deal Player Hand
+DealingHands --> FirstBetRound : All player have hands
+
+FirstBetRound --> FirstBetRound : Player Action (Bet/Call/Fold/Raise)
+FirstBetRound --> Drawing : Betting round ended
+
+Drawing --> Drawing : Player Change cards
+Drawing --> SecondBetRound : All players acted
+
+
+SecondBetRound --> SecondBetRound : Player Action (Bet/Call/Fold/Raise)
+SecondBetRound --> Showdown : Betting round ended
+
+Showdown --> Showdown : Player reveal cards
+Showdown --> EndOfHand : All players revealed
+
+EndOfHand --> EndOfHand : calculate reward
+EndOfHand --> EndOfHand : update pot and balances
+EndOfHand --> EndOfHand : change dealer 
+EndOfHand --> PostingBlinds 
