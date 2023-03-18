@@ -16,11 +16,12 @@ import           Control.Monad.State       (MonadState, StateT (runStateT),
                                             evalStateT, get, put)
 
 import           Control.Monad.Error.Class (MonadError (throwError))
-import           PokerGame                 (PokerGame, addPlayerToGame,
+import           PokerGame                 (PokerPlayerAction(..), PokerGame (_gamePlayerTurnIndex), addPlayerToGame, 
                                             dealHands, initPokerGame, setDealer,
-                                            startPokerGame)
+                                            startPokerGame, postBlinds, inGameBettingAction)
 import           System.Random             (Random (randomR), RandomGen,
                                             newStdGen)
+import Data.Either.Extra (maybeToEither)
 
 newtype Env =
   Env
@@ -34,7 +35,7 @@ newtype PokerApp a =
   deriving (Functor, Applicative, Monad)
 
 runPokerApp :: Env -> PokerGame -> PokerApp a -> IO a
-runPokerApp env pg a@(PokerApp app) =
+runPokerApp env pg papp@(PokerApp app) =
   let readerAction = runReaderT app env
       stateAction = evalStateT readerAction pg
       exceptAction = runExceptT stateAction
@@ -43,7 +44,7 @@ runPokerApp env pg a@(PokerApp app) =
            Right a -> return a
            Left e -> do
              print e
-             runPokerApp env pg a -- re-run the app when error occurs
+             runPokerApp env pg papp -- re-run the app when error occurs
 
 instance MonadIO PokerApp where
   liftIO :: IO a -> PokerApp a
@@ -114,11 +115,24 @@ testPokerApp = do
   g1 <- liftEither $ addPlayerToGame p1name p1chips g
   (p2name, p2chips) <- liftIO initPlayer
   g2 <- liftEither $ addPlayerToGame p2name p2chips g1
+  (p3name, p3chips) <- liftIO initPlayer
+  g2 <- liftEither $ addPlayerToGame p3name p3chips g2
   liftIO $ print g2
   g3 <- liftEither $ startPokerGame g2
   liftIO $ print g3
-  g4 <- liftEither $ setDealer 1 g3
+  g4 <- liftEither $ setDealer 0 g3
   liftIO $ print g4
-  g5 <- liftEither $ dealHands g4
+  g5 <- liftEither $ postBlinds g4
   liftIO $ print g5
+  g6 <- liftEither $ dealHands g5
+  liftIO $ print g6
+  pt <- liftEither $ maybeToEither "err" $ _gamePlayerTurnIndex g6
+  g7 <- liftEither $ inGameBettingAction pt (Raise 10) g6
+  liftIO $ print g7
+  pt <- liftEither $ maybeToEither "err" $ _gamePlayerTurnIndex g7
+  g8 <- liftEither $ inGameBettingAction pt FoldHand g7
+  liftIO $ print g8
+  pt <- liftEither $ maybeToEither "err" $ _gamePlayerTurnIndex g8
+  g9 <- liftEither $ inGameBettingAction pt (Call 9) g8
+  liftIO $ print g9
   return ()

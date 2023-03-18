@@ -1,11 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-unused-imports #-}
 
 module PokerLogicTests where
 
 import           Cards      (Card)
 import           PokerGame  (mkHand)
-import           PokerLogic (Combination (combHandRank, combStructure),
+import           PokerLogic (Combination (combHandRank),
                              HandRank (Flush, FourOfaKind, FullHouse, Highcard, OnePair, RoyalFlush, Straight, StraightFlush, ThreeOfaKind, TwoPairs),
                              evaluateHand)
 import           Test.Hspec (describe, hspec, it, shouldBe)
