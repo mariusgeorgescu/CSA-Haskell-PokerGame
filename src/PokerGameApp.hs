@@ -18,7 +18,7 @@ import           Control.Monad.State       (MonadState, StateT (runStateT),
 import           Control.Monad             (replicateM_)
 import           Control.Monad.Error.Class (MonadError (throwError))
 import           Data.Either.Extra         (maybeToEither)
-import           PokerGame                 (PokerGame (_gamePlayerTurnIndex),
+import           PokerGame                 (PokerGame (gamePlayerTurnIndex),
                                             PokerPlayerAction (..),
                                             addPlayerToGame, dealHands,
                                             inGameBettingAction, initPokerGame,

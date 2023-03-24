@@ -1,10 +1,8 @@
-{-# LANGUAGE DeriveAnyClass   #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE InstanceSigs     #-}
-{-# LANGUAGE NamedFieldPuns   #-}
-{-# LANGUAGE RecordWildCards  #-}
-{-# LANGUAGE TemplateHaskell  #-}
-{-# OPTIONS_GHC -Wno-unused-do-bind #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE InstanceSigs        #-}
+{-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE RecordWildCards     #-}
 
 module PokerGame
   ( mkHand
@@ -12,14 +10,13 @@ module PokerGame
   , Hand(handCards)
   , setDealer
   , dealHands
-  , PokerGame(_gamePlayers, _gamePlayerTurnIndex)
-  , PokerPlayer(_playerHand)
+  , PokerGame(gamePlayers, gamePlayerTurnIndex)
+  , PokerPlayer(playerHand)
   , PokerPlayerAction(..)
   , initPokerGame
   , addPlayerToGame
   , discardAndDraw
   , postBlinds
-  , inGameBettingAction
   ) where
 
 import           Cards             (Card, Deck, drawCards, mkFullDeck,
@@ -63,25 +60,25 @@ data GameState
 -- | Game
 data PokerGame =
   FiveCardDraw
-    { _gameState           :: GameState
-    , _gameDeck            :: Deck
-    , _gameMuck            :: [Card]
-    , _gameBets            :: [(Int, PokerPlayerAction)]
-    , _gameDealerIndex     :: Maybe Int
-    , _gamePlayerTurnIndex :: Maybe Int
-    , _gameMinBet          :: Int
-    , _gamePlayers         :: [PokerPlayer]
+    { gameState           :: GameState
+    , gameDeck            :: Deck
+    , gameMuck            :: [Card]
+    , gameBets            :: [(Int, PokerPlayerAction)]
+    , gameDealerIndex     :: Maybe Int
+    , gamePlayerTurnIndex :: Maybe Int
+    , gameMinBet          :: Int
+    , gamePlayers         :: [PokerPlayer]
     }
 
 
 -- | Player
 data PokerPlayer =
   PokerPlayer
-    { _playerBettingActions :: [PokerPlayerAction]
-    , _playerHand           :: Maybe Hand
-    , _playerId             :: Int
-    , _playerName           :: String
-    , _playerChips          :: Int
+    { playerBettingActions :: [PokerPlayerAction]
+    , playerHand           :: Maybe Hand
+    , playerId             :: Int
+    , playerName           :: String
+    , playerChips          :: Int
     }
 
 
@@ -95,14 +92,6 @@ newtype Hand =
 -------------------------------------------------------------------------------
 --  Instances
 -------------------------------------------------------------------------------
-
--- Generate lenses for PokerGame
-makeLenses ''PokerGame
-
-
--- Generate lenses for PokerPlayer
-makeLenses ''PokerPlayer
-
 instance Show Hand where
   show :: Hand -> String
   show (FiveCardDrawHand cards) = show cards
@@ -118,25 +107,30 @@ instance Arbitrary Hand where
 instance Show PokerPlayer where
   show :: PokerPlayer -> String
   show PokerPlayer {..} =
-    "\tPLAYER #" ++ show _playerId ++ " " ++ _playerName ++ "\n" ++ "\tHand: " ++
-    maybe "empty hand" show _playerHand ++
+    "\tPLAYER #" ++
+    show playerId ++
+    " " ++
+    playerName ++
+    "\n" ++
+    "\tHand: " ++
+    maybe "empty hand" show playerHand ++
     "\n" ++
     "\tChips: " ++
-    show _playerChips ++
+    show playerChips ++
     "\n" ++
     "\tLast Action: " ++
-    if null _playerBettingActions
+    if null playerBettingActions
       then "no last action"
-      else show _playerBettingActions ++ "\n"
+      else show playerBettingActions ++ "\n"
 
 instance Eq PokerPlayer
  where
   (==) :: PokerPlayer -> PokerPlayer -> Bool
-  (==) p1 p2 = _playerId p1 == _playerId p2
+  (==) p1 p2 = playerId p1 == playerId p2
 
 instance Ord PokerPlayer where
   compare :: PokerPlayer -> PokerPlayer -> Ordering
-  compare p1 p2 = compare (_playerId p1) (_playerId p2)
+  compare p1 p2 = compare (playerId p1) (playerId p2)
 
 instance Show PokerGame where
   show :: PokerGame -> String
@@ -145,30 +139,30 @@ instance Show PokerGame where
     "------| POKER GAME DETAILS |------- \n" ++
     "------------------------------------\n" ++
     "Current state : " ++
-    show _gameState ++
+    show gameState ++
     "\n" ++
     "Minimum bet: " ++
-    show _gameMinBet ++
+    show gameMinBet ++
     "\n" ++
     "Dealer: " ++
-    maybe "not set" (_playerName . (_gamePlayers !!)) _gameDealerIndex ++
+    maybe "not set" (playerName . (gamePlayers !!)) gameDealerIndex ++
     "\n" ++
     "Player turn: " ++
-    maybe "not set" (_playerName . (_gamePlayers !!)) _gamePlayerTurnIndex ++
+    maybe "not set" (playerName . (gamePlayers !!)) gamePlayerTurnIndex ++
     "\n" ++
     "Deck :" ++
-    show _gameDeck ++
+    show gameDeck ++
     "\n" ++
     "Muck :" ++
-    show _gameMuck ++
+    show gameMuck ++
     "\n" ++
     "Bets :" ++
-    show _gameBets ++
+    show gameBets ++
     "\n" ++
     "Players :\n" ++
     "------------------------------------\n" ++
-    intercalate "\n" (show <$> _gamePlayers) ++ "\n" ++
-    "------------------------------------"
+    intercalate "\n" (show <$> gamePlayers) ++
+    "\n" ++ "------------------------------------"
 
 -------------------------------------------------------------------------------
 -- * Hand function
@@ -225,24 +219,6 @@ mkPokerPlayer' p_id p_name p_chips =
         else Success p_name
 
 
---       setNextPlayerTurn
-
---     put $ game & gamePlayers . ix (player ^. playerId) .~ updated_player &
-
---     updated_player <- player & playerBettingAction (Call val_to_call)
-
---   else do
-
---   then throwError "Game: Insufficient chips to call"
-
--- if val_to_call > player ^. playerChips
-
--- let val_to_call = game ^. gameMinBet - player_stake
-
--- let player_stake = sum $ actionVal <$> (player ^. playerBettingActions)
-
--- let player = (game ^. gamePlayers) !! pid
-
 -------------------------------------------------------------------------------
 -- * Game functions
 -------------------------------------------------------------------------------
@@ -266,21 +242,21 @@ addPlayerToGame ::
   -> PokerGame -- ^ The PokerGame to add the player
   -> Either String PokerGame
 addPlayerToGame p_name p_chips game
-  | null p_name                   = Left "Game: Invalid player name"
-  | p_chips <= game ^. gameMinBet = Left "Game: Invalid no. of chips"
-  | otherwise                     = do
+  | null p_name                  = Left "Game: Invalid player name"
+  | p_chips <= game.gameMinBet = Left "Game: Invalid no. of chips"
+  | otherwise                    = do
     toEither . isValidForAddPlayer $ game
-    new_player <- mkPokerPlayer (length $ game ^. gamePlayers) p_name p_chips
-    return $ game & gamePlayers %~ (++[new_player])
+    new_player <- mkPokerPlayer (length $ game.gamePlayers) p_name p_chips
+    return $ game {gamePlayers = game.gamePlayers ++ [new_player]}
 
 
 -- | Function to check if a game is in a valid state to add a new player.
 isValidForAddPlayer :: PokerGame -> Validation String ()
 isValidForAddPlayer FiveCardDraw {..}
-  | _gameState /= NotStarted =
+  | gameState /= NotStarted =
     Failure "Game: Invalid state for adding new player"
-  | length _gamePlayers >= 5 = Failure "Game: To many players"
-  | otherwise                = Success ()
+  | length gamePlayers >= 5 = Failure "Game: To many players"
+  | otherwise               = Success ()
 
 
 -- | Function to start a poker game.
@@ -288,14 +264,14 @@ isValidForAddPlayer FiveCardDraw {..}
 startPokerGame :: PokerGame -> Either String PokerGame
 startPokerGame game = do
   toEither . isValidForStart $ game
-  return $ game & gameState .~ ChooseDealer
+  return $ game {gameState = ChooseDealer}
 
 
 -- | Function to check if a game is in a valid state to start.
 isValidForStart :: PokerGame -> Validation String ()
 isValidForStart FiveCardDraw {..}
-  | _gameState /= NotStarted = Failure "Game: Invalid state to start the game"
-  | ((||) <$> (< 2) <*> (> 5)) . length $ _gamePlayers =
+  | gameState /= NotStarted = Failure "Game: Invalid state to start the game"
+  | ((||) <$> (< 2) <*> (> 5)) . length $ gamePlayers =
     Failure "Game: Wrong no. of players"
   | otherwise = Success ()
 
@@ -304,164 +280,170 @@ isValidForStart FiveCardDraw {..}
 -- Returns a game with updated  dealerIndex, playerTurnIndex and gameState
 setDealer :: Int -> PokerGame -> Either String PokerGame
 setDealer n game@FiveCardDraw {..}
-  | n < 0                         = Left "Game: Dealer index must be positive"
-  | n > (length _gamePlayers - 1) = Left "Game: Dealer index to high"
-  | otherwise                     = do
+  | n < 0                        = Left "Game: Dealer index must be positive"
+  | n > (length gamePlayers - 1) = Left "Game: Dealer index to high"
+  | otherwise                    = do
     toEither . isValidForChooseDealer $ game
-    return $ game & gameDealerIndex ?~ n
-                  & gamePlayerTurnIndex ?~ ((n + 1) `mod` length (game ^. gamePlayers))
-                  & gameState .~ PostingBlinds
+    return $
+      game
+        { gameDealerIndex = Just n
+        , gamePlayerTurnIndex = Just ((n + 1) `mod` length (game.gamePlayers))
+        , gameState = PostingBlinds
+        }
+
 
 -- | Function to check if a game is in a valid state to choose dealer.
 isValidForChooseDealer :: PokerGame -> Validation String ()
 isValidForChooseDealer FiveCardDraw {..}
-  | _gameState /= ChooseDealer = Failure "Game: Wrong game state to set dealer"
-  | otherwise                  = Success ()
+  | gameState /= ChooseDealer = Failure "Game: Wrong game state to set dealer"
+  | otherwise                 = Success ()
 
 
 -- | Function to update the playerTurnIndex of a game.
 -- Returns a game with updated playerTurnIndex
 setNextPlayerTurn :: PokerGame -> PokerGame
 setNextPlayerTurn game =
-  game & gamePlayerTurnIndex %~
-  fmap (\n -> (n + 1)`mod` length (game ^. gamePlayers))
+  game
+    { gamePlayerTurnIndex =
+        (\n -> (n + 1) `mod` length (game.gamePlayers)) <$>
+        game.gamePlayerTurnIndex
+    }
 
+
+replaceAt :: Int -> a -> [a] -> [a]
+replaceAt idx newVal list = let (start, end) = splitAt idx list
+                            in start ++ newVal : tail end
 
 -- | Function for posting blinds.
 -- Returns a game with updated gameState,  gamePlayers data, and gameBets.
 postBlinds :: PokerGame -> Either String PokerGame
 postBlinds game = do
-    toEither . isValidForPostingBlings $ game
-    pti <- maybeToEither "Player turn not set" $ game ^. gamePlayerTurnIndex
-    let (fst_i, snd_i) = (pti, pti + 1)
-    let blind_val = game ^. gameMinBet
-    let fst_blind = (game ^. gamePlayers) !! fst_i
-    let snd_blind = (game ^. gamePlayers) !! snd_i
-    new_fst <- playerBettingAction (Bet blind_val) fst_blind
-    new_snd <- playerBettingAction (Bet blind_val) snd_blind
-    return $ game & gamePlayers . ix fst_i .~ new_fst
-                  & gameBets %~ ((new_fst ^. playerId, Bet blind_val) :)
-                  & setNextPlayerTurn
-                  & gamePlayers . ix snd_i .~ new_snd
-                  & gameBets %~ ((new_snd ^. playerId, Bet blind_val) :)
-                  & setNextPlayerTurn
-                  & gameState .~ DealingHands
+  toEither . isValidForPostingBlings $ game
+  pti <- maybeToEither "Player turn not set" $ game.gamePlayerTurnIndex
+  let (fst_i, snd_i) = (pti, pti + 1)
+  let blind_val = game.gameMinBet
+  let fst_blind = (game.gamePlayers) !! fst_i
+  let snd_blind = (game.gamePlayers) !! snd_i
+  new_fst <- playerBettingAction (Bet blind_val) fst_blind
+  new_snd <- playerBettingAction (Bet blind_val) snd_blind
+  return $ game {gamePlayers = replaceAt fst_i new_fst game.gamePlayers}
+    --               & gameBets %~ ((new_fst ^. playerId, Bet blind_val) :)
+    --               & setNextPlayerTurn
+    --               & gamePlayers . ix snd_i .~ new_snd
+    --               & gameBets %~ ((new_snd ^. playerId, Bet blind_val) :)
+    --               & setNextPlayerTurn
+    --               & gameState .~ DealingHands
 
 isValidForPostingBlings :: PokerGame -> Validation String ()
 isValidForPostingBlings FiveCardDraw {..}
-  | _gameState /= PostingBlinds =
+  | gameState /= PostingBlinds =
     Failure "Game: Wrong game state for posting blinds"
   | otherwise = Success ()
 
 
 -- | Function to deal hands to players. Returns a game with updated state, deck and players' data.
 dealHands :: PokerGame -> Either String PokerGame
-dealHands game@FiveCardDraw {_gameState, _gameDeck, _gamePlayers}
-  | _gameState /= DealingHands =
+dealHands game@FiveCardDraw {gameState, gameDeck, gamePlayers}
+  | gameState /= DealingHands =
     Left "Game: Invalid game state for dealing hands"
   | otherwise = do
-    let no_of_cards_to_deal = length _gamePlayers * 5
-    (cards_to_deal, newDeck) <- drawCards no_of_cards_to_deal _gameDeck
-    let deal = groupSort (zip (cycle _gamePlayers) cards_to_deal) -- deal in round robin fashion
+    let no_of_cards_to_deal = length gamePlayers * 5
+    (cards_to_deal, newDeck) <- drawCards no_of_cards_to_deal gameDeck
+    let deal = groupSort (zip (cycle gamePlayers) cards_to_deal) -- deal in round robin fashion
     updatedPlayers <- traverse (uncurry dealHandToPlayer) deal
     return $
       game
-        { _gameState = FirstBetRound
-        , _gameDeck = newDeck
-        , _gamePlayers = updatedPlayers
+        { gameState = FirstBetRound
+        , gameDeck = newDeck
+        , gamePlayers = updatedPlayers
         }
   where
     dealHandToPlayer :: PokerPlayer -> [Card] -> Either String PokerPlayer
     dealHandToPlayer player cards = do
       h <- mkHand cards
-      return $ player {_playerHand = Just h}
+      return $ player {playerHand = Just h}
 
 
 -- | Function to apply a betting action to a game.
 -- Returns the game with updated players data, gameBets, maybe gameMuck and gameMinBet
-inGameBettingAction ::
-     Int -> PokerPlayerAction -> PokerGame -> Either String PokerGame
-inGameBettingAction player_id action game@FiveCardDraw {..} = do
-  toEither $ isValidForBetting game
-  toEither $ isValidPlayerTurn player_id game
-  let player = (game ^. gamePlayers) !! player_id
-  updated_player <- playerBettingAction action player
-  let updated_game  =game & gamePlayers . ix player_id .~ updated_player
-                          & gameBets %~ ((player_id, action) :)
-                          & setNextPlayerTurn
-  case action of
-        Bet _ -> Left "Invalid action"
-        FoldHand -> do
-          let folded_hand = maybeToEither "Invalid hand" $ updated_player ^. playerHand
-          let folded_player = updated_player & playerHand .~ Nothing
-          folded_cards <-  handCards <$> folded_hand
-          return $ updated_game & gamePlayers . ix player_id .~ folded_player
-                        & gameMuck %~ (folded_cards ++)
-        Call n -> return updated_game
+-- inGameBettingAction ::
+--      Int -> PokerPlayerAction -> PokerGame -> Either String PokerGame
+-- inGameBettingAction player_id action game@FiveCardDraw {..} = do
+--   toEither $ isValidForBetting game
+--   toEither $ isValidPlayerTurn player_id game
+--   let player = game.gamePlayers !! player_id
+--   updated_player <- playerBettingAction action player
+--   let updated_game  =game & gamePlayers . ix player_id .~ updated_player
+--                           & gameBets %~ ((player_id, action) :)
+--                           & setNextPlayerTurn
+--   case action of
+--         Bet _ -> Left "Invalid action"
+--         FoldHand -> do
+--           let folded_hand = maybeToEither "Invalid hand" $ updated_player.playerHand
+--           let folded_player = updated_player{playerHand = Nothing}
+--           folded_cards <-  handCards <$> folded_hand
+--           return $ updated_game & gamePlayers . ix player_id .~ folded_player
+--                         & gameMuck %~ (folded_cards ++)
+--         Call n -> return updated_game
 
-        Raise n -> return $ updated_game & gameMinBet .~  n
-        AllIn n -> return game
-
-
-
+--         Raise n -> return $ updated_game & gameMinBet .~  n
+--         AllIn n -> return game
 isValidForBetting :: PokerGame -> Validation String ()
 isValidForBetting FiveCardDraw {..}
-  | _gameState `notElem` [FirstBetRound, SecondBetRound] =
+  | gameState `notElem` [FirstBetRound, SecondBetRound] =
     Failure "> Game: Wrong game state"
-  | isNothing _gamePlayerTurnIndex = Failure "> Game: Player Turn not set"
-  | otherwise                      = Success ()
+  | isNothing gamePlayerTurnIndex = Failure "> Game: Player Turn not set"
+  | otherwise                     = Success ()
 
 isValidPlayerTurn :: Int -> PokerGame -> Validation String ()
 isValidPlayerTurn player_id game
-  | game ^. gamePlayerTurnIndex /= Just player_id =
+  | game.gamePlayerTurnIndex /= Just player_id =
     Failure "Game: Invalid player "
   | otherwise = Success ()
-
-
 
 playerBettingAction ::
      PokerPlayerAction -> PokerPlayer -> Either String PokerPlayer
 playerBettingAction action player =
-  getChipsFromPlayer (actionVal action) $ player & playerBettingActions %~
-  (action :)
+  getChipsFromPlayer (actionVal action) $
+  player {playerBettingActions = action : player.playerBettingActions}
   where
     getChipsFromPlayer :: Int -> PokerPlayer -> Either String PokerPlayer
     getChipsFromPlayer val p
-      | player ^. playerChips < val = Left "Player: Insufficient chips"
-      | otherwise          = return $ p & playerChips %~ subtract val
+      | player.playerChips < val = Left "Player: Insufficient chips"
+      | otherwise                  = return $ p {playerChips = p.playerChips - val}
 
 
 -- | Function to discard and draw for a player. Returns a game with updated state, deck and the player data.
 discardAndDraw :: Int -> [Int] -> PokerGame -> Either String PokerGame
-discardAndDraw pid to_discard game@FiveCardDraw { _gameState
-                                                , _gamePlayers
-                                                , _gamePlayerTurnIndex
-                                                , _gameDeck
-                                                , _gameMuck
+discardAndDraw pid to_discard game@FiveCardDraw { gameState
+                                                , gamePlayers
+                                                , gamePlayerTurnIndex
+                                                , gameDeck
+                                                , gameMuck
                                                 }
-  | _gameState /= Drawing                 = Left "Game: Invalid state for drawing"
-  | length to_discard > 5                 = Left "Game: Invalid no of cards to discard"
-  | not (isPlayerInGame pid _gamePlayers) = Left "Game: Invalid player id"
-  | _gamePlayerTurnIndex /= Just pid      = Left "Game: Invalid player turn"
-  | otherwise                             = do
-    let current_player = _gamePlayers !! pid
-    case _playerHand current_player of
+  | gameState /= Drawing                 = Left "Game: Invalid state for drawing"
+  | length to_discard > 5                = Left "Game: Invalid no of cards to discard"
+  | not (isPlayerInGame pid gamePlayers) = Left "Game: Invalid player id"
+  | gamePlayerTurnIndex /= Just pid      = Left "Game: Invalid player turn"
+  | otherwise                            = do
+    let current_player = gamePlayers !! pid
+    case playerHand current_player of
       Nothing -> Left "Empty hand"
       Just current_hand -> do
-        (drawn, new_deck) <- drawCards (length to_discard) _gameDeck
+        (drawn, new_deck) <- drawCards (length to_discard) gameDeck
         (discarded, new_hand) <- updateHand drawn to_discard current_hand
-        let new_player = current_player {_playerHand = Just new_hand}
-        let new_players = updateList _gamePlayers pid new_player
+        let new_player = current_player {playerHand = Just new_hand}
+        let new_players = updateList gamePlayers pid new_player
         let updated_game =
               game
-                { _gameMuck = discarded ++ _gameMuck
-                , _gameDeck = new_deck
-                , _gamePlayers = new_players
+                { gameMuck = discarded ++ gameMuck
+                , gameDeck = new_deck
+                , gamePlayers = new_players
                 }
         return updated_game
   where
     isPlayerInGame :: Int -> [PokerPlayer] -> Bool
-    isPlayerInGame i pls = i `elem` (_playerId <$> pls)
+    isPlayerInGame i pls = i `elem` (playerId <$> pls)
 
 
 -- placeBet = _
