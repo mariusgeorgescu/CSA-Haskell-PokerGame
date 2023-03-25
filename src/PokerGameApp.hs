@@ -18,17 +18,26 @@ import           Control.Monad.State       (MonadState, StateT (runStateT),
 import           Control.Monad.Error.Class (MonadError (throwError))
 import           Control.Monad.Loops       (iterateUntil)
 
+import           Data.Char                 (toUpper)
 import           Data.Either.Extra         (maybeToEither)
-import           PokerGame                 (GameState (..),
-                                            PokerGame (gamePlayerTurnIndex, gamePlayers),
-                                            PokerPlayer (playerName),
+import           PokerGame                 (GameSettings (settingsMinBet),
+                                            GameState (..),
+                                            PokerGame (gamePlayerTurnIndex, gamePlayers, gameSettings),
+                                            PokerPlayer (PokerPlayer, playerName),
+                                            PokerPlayerAction (Call, FoldHand, Raise),
                                             addPlayerToGame, gameState,
                                             getCurrentPlayer,
                                             getCurrentPlayerId,
                                             getCurrentPlayerName, initPokerGame,
-                                            showPlayerInGame)
+                                            playerBettingAction,
+                                            showPlayerInGame, roundBettingAction)
+import           System.Console.Haskeline  (defaultSettings, getInputChar,
+                                            runInputT)
 import           System.Random             (Random (randomR), RandomGen,
                                             mkStdGen)
+import           Text.Read                 (readEither)
+import Control.Exception (catch)
+import Text.ParserCombinators.ReadP (char)
 
 data Env =
   Env
@@ -115,19 +124,22 @@ initGame = do
 addPlayers :: PokerApp ()
 addPlayers = do
   liftIO $ gameMessage "Waiting for players to join the game "
-  _ <- iterateUntil (== FirstBetRound) addPlayer
+  _ <- iterateUntil (== FirstBetRound) addPlayerAndReturnState
   g <- get
   liftIO $ gameMessage "Setting dealer, posting small blinds and dealing hands"
   liftIO $ print g
 
-addPlayer :: PokerApp GameState
+addPlayerAndReturnState :: PokerApp GameState
+addPlayerAndReturnState =  gameState <$> addPlayer
+
+addPlayer :: PokerApp PokerGame
 addPlayer = do
   name <- liftIO $ print "Enter your name: " >> getLine
   liftIO $ print "100 chips by default"
   g <- get
-  g1 <- liftEither $ addPlayerToGame name 100 2 g
+  g1 <- catchError (liftEither $ addPlayerToGame name 100 2 g) (handleLocalError addPlayer)
   put g1
-  return $ gameState g1
+  return g1
 
 printCurrentPlayer :: PokerApp ()
 printCurrentPlayer = do
@@ -135,12 +147,17 @@ printCurrentPlayer = do
   p_id <- liftEither $ getCurrentPlayerId game
   liftIO $ putStrLn $ showPlayerInGame game p_id
 
-bettingAction :: PokerApp ()
+bettingAction :: PokerApp PokerGame
 bettingAction = do
   liftIO $ gameMessage "Betting Action"
-  liftIO $ print "Player's Turn : "
+  liftIO $ putStrLn "Player's Turn : "
   printCurrentPlayer
-  return ()
+  user_action <- getActionFromUser
+  game <- get
+  g <- catchError (liftEither (roundBettingAction user_action game)) (handleLocalError bettingAction)
+  put g
+  liftIO $ print g
+  return g
 
 
 --
@@ -154,3 +171,55 @@ gameMessage message =
       "\ESC[92m" ++
       replicate pas '*' ++
       "|  " ++ message ++ "  |" ++ replicate pas '*' ++ "\ESC[0m"
+
+
+gameErrorMessage :: String -> IO ()
+gameErrorMessage message = putStrLn $ "\ESC[31m" ++ message ++ "\ESC[0m"
+
+
+printAvailableActions :: IO ()
+printAvailableActions =
+  putStrLn
+    "| \ESC[92mC - Call\ESC[0m | \ESC[95mR - Raise\ESC[0m | \ESC[91mF - Fold\ESC[0m | \ESC[92mA - All In\ESC[0m |"
+
+getActionFromUser :: PokerApp PokerPlayerAction
+getActionFromUser = do
+  g <- get
+  liftIO $ putStrLn "Choose your action : "
+  liftIO printAvailableActions
+  c <- liftEither . maybeToEither "error" =<< liftIO getCharFromTerminal
+  catchError (liftEither =<< charToAction c) (handleLocalError getActionFromUser)
+
+
+
+handleLocalError :: PokerApp a -> String -> PokerApp a
+handleLocalError g e = do
+          liftIO $ gameErrorMessage e
+          liftIO $ putStrLn "Try again ... "
+          g
+
+
+
+
+charToAction :: Char -> PokerApp (Either String PokerPlayerAction)
+charToAction c
+  | toUpper c == 'C' = do
+    g <- get
+    return $ Right $ Call (settingsMinBet . gameSettings $ g)
+  | toUpper c == 'R' = do
+    i <- liftEither =<< liftIO getIntFromTerminal
+    g2 <- get
+    liftIO $ print g2
+    return $ Right $ Raise i
+  | toUpper c == 'F' = return $ Right FoldHand
+  | toUpper c == 'A' = return $ Left "All in not implemented"
+  | otherwise        = return $ Left "Invalid option"
+
+getCharFromTerminal :: IO (Maybe Char)
+getCharFromTerminal =
+  runInputT defaultSettings (getInputChar "Type your option and press enter: ")
+
+getIntFromTerminal :: IO (Either String Int)
+getIntFromTerminal = do
+  print "Enter amount: "
+  readEither <$> getLine

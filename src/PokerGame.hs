@@ -14,7 +14,9 @@ import           Data.IntMap        (insert, keys, lookup, size, toList, update)
 import           Data.IntMap.Strict (IntMap, elems, fromList, insertWith)
 import           Data.List          (nub)
 import           Data.List.Extra    (allSame, groupSort, intercalate, partition)
+import           Data.Maybe         (fromMaybe)
 import           Data.Validation    (Validation (..), toEither)
+import           GHC.Unicode        (isAlpha)
 import           Prelude            hiding (lookup)
 import           Test.QuickCheck    (Arbitrary (arbitrary), Gen, vectorOf)
 
@@ -155,8 +157,8 @@ mkPokerPlayer' p_id p_name =
         then Failure "| Player: Invalid ID"
         else Success p_id
     valid_name =
-      if null p_name
-        then Failure "| Player: Invalid name"
+      if null p_name || (not . all isAlpha) p_name
+        then Failure $ "| Player: Invalid name: " ++ p_name
         else Success p_name
 
 -------------------------------------------------------------------------------
@@ -284,7 +286,7 @@ playerBettingAction action game@FiveDraw {..}
     pti <- getCurrentPlayerId game
     p_chips <- getCurrentPlayerChips game
     if actionVal action > p_chips
-      then Left "Invalid action"
+      then Left $ "Invalid action : Insufficient chips.\nAvailable chips:" ++ show p_chips ++ " and trying to " ++ show action
       else return
              game
                { gamePlayersChips =
@@ -300,7 +302,7 @@ roundBettingAction :: PokerPlayerAction -> PokerGame -> Either String PokerGame
 roundBettingAction action game@FiveDraw {..} = do
   pti <- getCurrentPlayerId game
   current_player <- getCurrentPlayer game
-  current_actions <- getCurrentPlayerBets game
+  let current_actions = getCurrentPlayerBets game
   let current_player_bet = sum $ actionVal <$> current_actions
   chips_bets_turn <- playerBettingAction action game
   updated_game <-
@@ -417,10 +419,11 @@ getCurrentPlayerId :: PokerGame -> Either String Int
 getCurrentPlayerId FiveDraw {..} =
   maybeToEither "Error: Invalid player id 1" gamePlayerTurnIndex
 
-getCurrentPlayerBets :: PokerGame -> Either String [PokerPlayerAction]
-getCurrentPlayerBets game@FiveDraw {..} = do
-  pti <- getCurrentPlayerId game
-  maybeToEither "Error: Invalid player id 2" $ lookup pti gamePlayersBets
+getCurrentPlayerBets :: PokerGame -> [PokerPlayerAction]
+getCurrentPlayerBets FiveDraw {..} = do
+  case gamePlayerTurnIndex of
+    Nothing  -> []
+    Just pti -> fromMaybe [] $ lookup pti gamePlayersBets
 
 getCurrentPlayerChips :: PokerGame -> Either String Int
 getCurrentPlayerChips game@FiveDraw {..} = do
@@ -447,8 +450,8 @@ showPlayerInGame :: PokerGame -> Int -> String
 showPlayerInGame FiveDraw {..} p_id =
   let p_chips = maybe "No bets" show $ lookup p_id gamePlayersChips
       p_bets = maybe "No bets" show $ lookup p_id gamePlayersBets
-      player = maybe "No player" show  $ lookup p_id gamePlayers
-   in player ++ "\tBets : " ++  p_bets ++ "\n\tChips: " ++ p_chips ++ "\n"
+      player = maybe "No player" show $ lookup p_id gamePlayers
+   in player ++ "\tBets : " ++ p_bets ++ "\n\tChips: " ++ p_chips ++ "\n"
 
 showGame :: PokerGame -> String
 showGame game@FiveDraw {..} =
