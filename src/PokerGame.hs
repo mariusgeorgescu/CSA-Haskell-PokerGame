@@ -7,23 +7,18 @@
 module PokerGame where
 
 import           Cards                        (Card, Deck, drawCards,
-                                               mkFullDeck, shuffleDeck)
+                                               mkFullDeck)
 
 import           Data.Bifunctor               (Bifunctor (bimap))
 import           Data.Either.Extra            (maybeToEither)
-import           Data.IntMap                  (foldr', insert, lookup, size,
+import           Data.IntMap                  (insert, lookup, size,
                                                toList, update)
-import           Data.IntMap.Strict           (IntMap, fromList, keys, toList,
-                                               traverseWithKey)
-import           Data.List                    (intercalate, nub)
+import           Data.IntMap.Strict           (IntMap, fromList)
+import           Data.List                    (nub)
 import           Data.List.Extra              (groupSort, partition)
-import           Data.Maybe                   (isNothing)
 import           Data.Validation
 import           Prelude                      hiding (lookup)
-import           Test.QuickCheck              (Arbitrary (arbitrary), Gen,
-                                               Result, vectorOf)
-import           Text.ParserCombinators.ReadP (look)
-import qualified PokerGame as game.gamePlayerTurnIndexgameSettings
+import           Test.QuickCheck              (Arbitrary (arbitrary), Gen, vectorOf)
 
 -------------------------------------------------------------------------------
 -- * Declarations
@@ -303,7 +298,7 @@ postBlinds :: PokerGame -> Either String PokerGame
 postBlinds game@FiveDraw {..}
   | gameState /= DealerSet = Left "Game: Invalid state for posting blinds"
   | otherwise =
-    let min_bet = game.gamePlayerTurnIndexgameSettings.settingsMinBet
+    let min_bet = game.gameSettings.settingsMinBet
      in playerBettingAction (Bet min_bet) =<<
         playerBettingAction (Bet min_bet) game {gameState = PostedBlinds, gameMaxBet = Just min_bet}
 
@@ -383,12 +378,12 @@ roundBettingAction action game@FiveDraw {..} = do
       if gameMaxBet >= Just (n + current_player_bet)
         then Left "Invalid raise action"
         else return updated_game {gameMaxBet = Just (n + current_player_bet)}
-    AllIn n -> return game
+    AllIn _ -> return game
 
 
 -- -- | Function to discard and draw for a player. Returns a game with updated state, deck and the player data.
 -- discardAndDraw :: Int -> [Int] -> PokerGame -> Either String PokerGame
--- discardAndDraw pid to_discard game@FiveCardDraw { gameState
+-- discardAndDraw pid to_discard game@FiveDraw { gameState
 --                                                 , gamePlayers
 --                                                 , gamePlayerTurnIndex
 --                                                 , gameDeck
