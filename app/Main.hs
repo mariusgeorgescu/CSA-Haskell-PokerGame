@@ -1,18 +1,17 @@
 module Main where
 
-import           PokerGame     (PokerGame, addPlayerToGame, dealHands,
-                                initPokerGame, setDealer, startPokerGame)
+import           PokerGame    
 
 import           PokerGameApp  (runPokerApp, testPokerApp, Env (Env))
 import           System.Random (Random (randomR), RandomGen, newStdGen)
 
-testRun2 :: [Int] -> Either String PokerGame
-testRun2 perms =
-  initPokerGame perms 10 >>= addPlayerToGame "Marius" 100 >>=
-  addPlayerToGame "Andrei" 100 >>=
-  startPokerGame >>=
-  setDealer 1 >>=
-  dealHands
+-- testRun2 :: [Int] -> Either String PokerGame
+-- testRun2 perms =
+--   initPokerGame perms 10 >>= addPlayerToGame "Marius" 100 >>=
+--   addPlayerToGame "Andrei" 100 >>=
+--   startPokerGame >>=
+--   setDealer 1 >>=
+--   dealHands
 
 randomList :: RandomGen g => g -> Int -> [Int]
 randomList gen n = go gen [0 .. n - 1]
@@ -27,5 +26,5 @@ main = do
   putStrLn "Hello, Haskell Poker Game!"
   gen <- newStdGen
   let perms = randomList gen 51
-  let g = initPokerGame perms 10
-  either print (flip (runPokerApp (Env 1)) testPokerApp) g
+  let g = initPokerGame perms 10 3
+  either print (flip (runPokerApp (Env 1 3)) testPokerApp) g

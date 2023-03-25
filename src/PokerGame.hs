@@ -1,24 +1,22 @@
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE InstanceSigs        #-}
-{-# LANGUAGE NamedFieldPuns      #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE InstanceSigs     #-}
+{-# LANGUAGE NamedFieldPuns   #-}
+{-# LANGUAGE RecordWildCards  #-}
 
 module PokerGame where
 
-import           Cards                        (Card, Deck, drawCards,
-                                               mkFullDeck)
+import           Cards              (Card, Deck, drawCards, mkFullDeck,
+                                     shuffleDeck)
 
-import           Data.Bifunctor               (Bifunctor (bimap))
-import           Data.Either.Extra            (maybeToEither)
-import           Data.IntMap                  (insert, lookup, size,
-                                               toList, update)
-import           Data.IntMap.Strict           (IntMap, fromList)
-import           Data.List                    (nub)
-import           Data.List.Extra              (groupSort, partition)
-import           Data.Validation
-import           Prelude                      hiding (lookup)
-import           Test.QuickCheck              (Arbitrary (arbitrary), Gen, vectorOf)
+import           Data.Bifunctor     (Bifunctor (bimap))
+import           Data.Either.Extra  (maybeToEither)
+import           Data.IntMap        (insert, keys, lookup, size, toList, update)
+import           Data.IntMap.Strict (IntMap, elems, fromList, insertWith)
+import           Data.List          (nub)
+import           Data.List.Extra    (allSame, groupSort, intercalate, partition)
+import           Data.Validation    (Validation (..), toEither)
+import           Prelude            hiding (lookup)
+import           Test.QuickCheck    (Arbitrary (arbitrary), Gen, vectorOf)
 
 -------------------------------------------------------------------------------
 -- * Declarations
@@ -30,20 +28,8 @@ data PokerPlayerAction
   | Call Int
   | Raise Int
   | AllIn Int
-  deriving (Show) -- , gameMuck            :: [Card]
-    -- , gamePlayersBets     :: IntMap [PokerPlayerAction]
-    -- , gamePlayersChips    :: IntMap Int
-    -- , gameDealerIndex     :: Maybe Int
-    -- , gamePlayerTurnIndex :: Maybe Int
-    -- , gameMinBet          :: Int
-    -- , gamePlayers         :: [PokerPlayer]
-    -- , gameValueToCall     :: Maybe Int
-    -- }
+  deriving (Show)
 
-
--- { gameDeck            :: Deck
-
--- | Game state
 
 -- | Game Params
 data GameSettings =
@@ -51,18 +37,21 @@ data GameSettings =
     { settingsMinBet            :: Int -- ^ Minimum bet value
     , settingsMinPlayersToStart :: Int -- ^ Minimum no of players to start the game
     }
+  deriving (Show)
 
+
+-- | Game state
 data GameState
   = NotStarted -- ^ The initial state of the game, where players are not yet playing.
   | DealerSet -- ^ Choose who is the dealer and determine the blinds based on that.
-  | PostedBlinds -- ^ Before each hand, the two players to the left of the dealer are required to post blind bets, which are small forced bets that begin the pot.
+  | PostingBlinds -- ^ Before each hand, the two players to the left of the dealer are required to post blind bets, which are small forced bets that begin the pot.
   | HandsDealt -- ^ After the blinds have been posted, the dealer deals five cards to each player, face down
   | FirstBetRound -- ^ Once the cards have been dealt, the first round of betting begins. Players can either fold, call (match the previous bet), or raise (increase the previous bet).
   | Drawing -- ^ After the first round of betting, players have the option to discard some or all of their cards and receive new ones from the dealer.
   | SecondBetRound -- ^ After the drawing round, another round of betting begins, with the same options as before: fold, call, or raise
   | Showdown -- ^ If more than one player is still in the hand after the second round of betting, a showdown occurs, where the players reveal their cards and the best hand wins the pot.
   | EndOfHand -- ^ After the pot has been awarded, the next hand begins, with the player to the left of the previous dealer becoming the new dealer.
-  deriving (Eq)
+  deriving (Eq, Show)
 
 
 -- | Game
@@ -122,50 +111,41 @@ instance Show PokerPlayer where
     playerName ++
     "\n" ++ "\tHand: " ++ maybe "empty hand" show playerHand ++ "\n"
 
-instance Eq PokerPlayer
- where
-  (==) :: PokerPlayer -> PokerPlayer -> Bool
-  (==) p1 p2 = playerId p1 == playerId p2
+instance Show PokerGame where
+  show :: PokerGame -> String
+  show FiveDraw {..} =
+    "------------------------------------\n" ++
+    "------| POKER GAME DETAILS |------- \n" ++
+    "------------------------------------\n" ++
+    "Current state : " ++
+    show gameState ++
+    "\n" ++
+    "Game settings: " ++
+    show gameSettings ++
+    "\n" ++
+    "Dealer: " ++
+    maybe "Not set" playerName (flip lookup gamePlayers =<< gameDealerIndex) ++
+    "\n" ++
+    "Player turn: " ++
+    maybe "Not set" playerName (flip lookup gamePlayers =<< gamePlayerTurnIndex) ++
+    "\n" ++
+    "Deck :" ++
+    show gameDeck ++
+    "\n" ++
+    "Muck :" ++
+    show gameMuck ++
+    "\n" ++
+    "Bets :" ++
+    show (toList gamePlayersBets) ++
+    "\n" ++
+    "Chips :" ++
+    show (toList gamePlayersChips) ++
+    "\n" ++
+    "Players :\n" ++
+    "------------------------------------\n" ++
+    intercalate "\n" (show <$> toList gamePlayers) ++
+    "\n" ++ "------------------------------------"
 
-instance Ord PokerPlayer where
-  compare :: PokerPlayer -> PokerPlayer -> Ordering
-  compare p1 p2 = compare (playerId p1) (playerId p2)
-
-
--- instance Show PokerGame where
---   show :: PokerGame -> String
---   show FiveCardDraw {..} =
---     "------------------------------------\n" ++
---     "------| POKER GAME DETAILS |------- \n" ++
---     "------------------------------------\n" ++
---     "Current state : " ++
---     show gameState ++
---     "\n" ++
---     "Minimum bet: " ++
---     show gameMinBet ++
---     "\n" ++
---     "Dealer: " ++
---     maybe "not set" (playerName . (gamePlayers !!)) gameDealerIndex ++
---     "\n" ++
---     "Player turn: " ++
---     maybe "not set" (playerName . (gamePlayers !!)) gamePlayerTurnIndex ++
---     "\n" ++
---     "Deck :" ++
---     show gameDeck ++
---     "\n" ++
---     "Muck :" ++
---     show gameMuck ++
---     "\n" ++
---     "Bets :" ++
---     show gamePlayersBets ++
---     "\n" ++
---     "Chips :" ++
---     show gamePlayersChips ++
---     "\n" ++
---     "Players :\n" ++
---     "------------------------------------\n" ++
---     intercalate "\n" (show <$> gamePlayers) ++
---     "\n" ++ "------------------------------------"
 -------------------------------------------------------------------------------
 -- * Hand function
 -------------------------------------------------------------------------------
@@ -220,13 +200,14 @@ mkPokerPlayer' p_id p_name =
 -------------------------------------------------------------------------------
 
 -- | Function to initate a PokerGame
-initPokerGame :: Int -> Int -> Either String PokerGame
-initPokerGame minBet psToStart = do
+initPokerGame :: [Int] -> Int -> Int -> Either String PokerGame
+initPokerGame perm minBet psToStart = do
+  deck <- shuffleDeck perm mkFullDeck
   gs <- toEither mkGameSettings
   Right $
     FiveDraw
       NotStarted
-      mkFullDeck
+      deck
       gs
       mempty
       mempty
@@ -249,13 +230,14 @@ initPokerGame minBet psToStart = do
 addPlayerToGame :: String -> Int -> Int -> PokerGame -> Either String PokerGame
 addPlayerToGame p_name p_chips p_nonce game@FiveDraw {..}
   | gameState /= NotStarted = Left "Game: Invalid state for adding new player"
+  | p_chips < settingsMinBet gameSettings = Left "Game: Invalid chips value"
   | otherwise =
     let p_id = size gamePlayers
      in if (p_id + 1) > 5
           then Left "Game: To many players"
           else do
             player <- mkPokerPlayer p_id p_name
-            if p_id + 1 < game.gameSettings.settingsMinPlayersToStart
+            if p_id + 1 < settingsMinPlayersToStart gameSettings
               then return
                      game
                        { gamePlayers = insert p_id player gamePlayers
@@ -288,7 +270,8 @@ setDealer game@FiveDraw {..}
     return $
       game
         { gameState = DealerSet
-        , gamePlayerTurnIndex = Just $ dealer_id + 1 `mod` size gamePlayers
+        , gameDealerIndex = Just dealer_id
+        , gamePlayerTurnIndex = Just $ (dealer_id + 1) `mod` size gamePlayers
         , gamePlayersBets = mempty
         }
 
@@ -296,22 +279,25 @@ setDealer game@FiveDraw {..}
 -- | Function for posting blinds.
 postBlinds :: PokerGame -> Either String PokerGame
 postBlinds game@FiveDraw {..}
-  | gameState /= DealerSet = Left "Game: Invalid state for posting blinds"
+  | gameState /= DealerSet =
+    Left $ "Game: Invalid state for posting blinds: " ++ show gameState
   | otherwise =
-    let min_bet = game.gameSettings.settingsMinBet
+    let min_bet = settingsMinBet gameSettings
      in playerBettingAction (Bet min_bet) =<<
-        playerBettingAction (Bet min_bet) game {gameState = PostedBlinds, gameMaxBet = Just min_bet}
+        playerBettingAction
+          (Bet min_bet)
+          game {gameState = PostingBlinds, gameMaxBet = Just min_bet}
 
 
 -- | Function to deal hands to players.
 dealHands :: PokerGame -> Either String PokerGame
 dealHands game@FiveDraw {..}
-  | gameState /= PostedBlinds = Left "Game: Wrong state to deal hands"
-  | otherwise                 = do
+  | gameState /= PostingBlinds = Left "Game: Wrong state to deal hands"
+  | otherwise                  = do
     let no_of_cards_to_deal = length gamePlayers * 5
     (cards_to_deal, newDeck) <- drawCards no_of_cards_to_deal gameDeck
-    let deal = groupSort (zip (cycle (toList gamePlayers)) cards_to_deal) -- deal in round robin fashion
-    updatedPlayers <- traverse (uncurry dealHandToPlayer) deal
+    let deal = groupSort (zip (cycle (keys gamePlayers)) cards_to_deal) -- deal in round robin fashion
+    updatedPlayers <- traverse (dealHandToPlayer game) deal
     return $
       game
         { gameDeck = newDeck
@@ -320,16 +306,16 @@ dealHands game@FiveDraw {..}
         }
   where
     dealHandToPlayer ::
-         (a, PokerPlayer) -> [Card] -> Either String (a, PokerPlayer)
-    dealHandToPlayer (k, player) cards = do
+         PokerGame -> (Int, [Card]) -> Either String (Int, PokerPlayer)
+    dealHandToPlayer FiveDraw {gamePlayers = gp} (k, cards) = do
+      player <- maybeToEither "error" $ lookup k gp
       h <- mkHand cards
       return (k, player {playerHand = Just h})
 
 playerBettingAction :: PokerPlayerAction -> PokerGame -> Either String PokerGame
 playerBettingAction action game@FiveDraw {..}
-  | gameState /= FirstBetRound ||
-      gameState /= SecondBetRound || gameState /= DealerSet =
-    Left "Game: Invalid State for Betting Action"
+  | gameState `notElem` [FirstBetRound, SecondBetRound, PostingBlinds] =
+    Left $ "Game: Invalid State for Betting Action" ++ show gameState
   | otherwise = do
     pti <- maybeToEither "error" gamePlayerTurnIndex
     p_chips <- maybeToEither "Invalid player id" $ lookup pti gamePlayersChips
@@ -338,13 +324,9 @@ playerBettingAction action game@FiveDraw {..}
       else return
              game
                { gamePlayersChips =
-                   update
-                     (Just . subtract (actionVal action))
-                     pti
-                     gamePlayersChips
-               , gamePlayersBets =
-                   update (Just . (action :)) pti gamePlayersBets
-               , gamePlayerTurnIndex = Just $ pti + 1 `mod` size gamePlayers
+                   insertWith subtract pti (actionVal action) gamePlayersChips
+               , gamePlayersBets = insertWith (++) pti [action] gamePlayersBets
+               , gamePlayerTurnIndex = Just $ (pti + 1) `mod` size gamePlayers
                }
 
 
@@ -357,67 +339,91 @@ roundBettingAction action game@FiveDraw {..} = do
   current_actions <-
     maybeToEither "Invalid player turn" $ lookup pti gamePlayersBets
   let current_player_bet = sum $ actionVal <$> current_actions
-  updated_game <- playerBettingAction action game
-  case action of
-    Bet _ -> Left "Invalid action"
-    FoldHand -> do
-      let folded_hand =
-            maybeToEither "Invalid hand" $ current_player.playerHand
-      let folded_player = current_player {playerHand = Nothing}
-      folded_cards <- handCards <$> folded_hand
-      return $
-        updated_game
-          { gamePlayers = update (Just . const folded_player) pti gamePlayers
-          , gameMuck = folded_cards ++ gameMuck
-          }
-    Call n ->
-      if Just (n + current_player_bet) /= gameMaxBet
-        then Left "Invalid call action"
-        else return updated_game
-    Raise n ->
-      if gameMaxBet >= Just (n + current_player_bet)
-        then Left "Invalid raise action"
-        else return updated_game {gameMaxBet = Just (n + current_player_bet)}
-    AllIn _ -> return game
+  chips_bets_turn <- playerBettingAction action game
+  updated_game <-
+    case action of
+      Bet _ -> Left "Invalid action"
+      FoldHand -> do
+        let folded_hand =
+              maybeToEither "Invalid hand" $ playerHand current_player
+        let folded_player = current_player {playerHand = Nothing}
+        folded_cards <- handCards <$> folded_hand
+        return $
+          chips_bets_turn
+            { gamePlayers = update (Just . const folded_player) pti gamePlayers
+            , gameMuck = folded_cards ++ gameMuck
+            }
+      Call n ->
+        if Just (n + current_player_bet) /= gameMaxBet
+          then Left "Invalid call action"
+          else return chips_bets_turn
+      Raise n ->
+        if gameMaxBet >= Just (n + current_player_bet)
+          then Left "Invalid raise action"
+          else return
+                 chips_bets_turn {gameMaxBet = Just (n + current_player_bet)}
+      AllIn _ -> return game
+  checkIfOver updated_game
+
+checkIfOver :: PokerGame -> Either String PokerGame
+checkIfOver game@FiveDraw {..} =
+  if allPlayersActed && noNewRaises
+    then if allButOneFolded
+           then return game {gameState = EndOfHand}
+           else if allButOneRemainingAllIn
+                  then return $ game {gameState = Showdown}
+                  else return $ game {gameState = Drawing}
+    else return game
+  where
+    allPlayersActed = allSame $ length <$> elems gamePlayersBets
+    noNewRaises     = not (any isRaise (head <$> elems gamePlayersBets))
+    remaining       = filter (not . isFold) <$> elems gamePlayersBets
+    allButOneFolded = length remaining == 1
+    allButOneRemainingAllIn =
+      length (filter (not . isAllIn) <$> elems gamePlayersBets) <= 1
+
+isRaise :: PokerPlayerAction -> Bool
+isRaise (Raise _) = True
+isRaise _         = False
+
+isFold :: PokerPlayerAction -> Bool
+isFold FoldHand = True
+isFold _        = False
+
+isAllIn :: PokerPlayerAction -> Bool
+isAllIn (AllIn _) = True
+isAllIn _         = False
 
 
--- -- | Function to discard and draw for a player. Returns a game with updated state, deck and the player data.
--- discardAndDraw :: Int -> [Int] -> PokerGame -> Either String PokerGame
--- discardAndDraw pid to_discard game@FiveDraw { gameState
---                                                 , gamePlayers
---                                                 , gamePlayerTurnIndex
---                                                 , gameDeck
---                                                 , gameMuck
---                                                 }
---   | gameState /= Drawing                 = Left "Game: Invalid state for drawing"
---   | length to_discard > 5                = Left "Game: Invalid no of cards to discard"
---   | not (isPlayerInGame pid gamePlayers) = Left "Game: Invalid player id"
---   | gamePlayerTurnIndex /= Just pid      = Left "Game: Invalid player turn"
---   | otherwise                            = do
---     let current_player = gamePlayers !! pid
---     case playerHand current_player of
---       Nothing -> Left "Empty hand"
---       Just current_hand -> do
---         (drawn, new_deck) <- drawCards (length to_discard) gameDeck
---         (discarded, new_hand) <- updateHand drawn to_discard current_hand
---         let new_player = current_player {playerHand = Just new_hand}
---         let new_players = updateList gamePlayers pid new_player
---         let updated_game =
---               game
---                 { gameMuck = discarded ++ gameMuck
---                 , gameDeck = new_deck
---                 , gamePlayers = new_players
---                 }
---         return updated_game
---   where
---     isPlayerInGame :: Int -> [PokerPlayer] -> Bool
---     isPlayerInGame i pls = i `elem` (playerId <$> pls)
+-- | Function to discard and draw for a player. Returns a game with updated state, deck and the player data.
+discardAndDraw :: [Int] -> PokerGame -> Either String PokerGame
+discardAndDraw to_discard game@FiveDraw { gameState
+                                        , gamePlayers
+                                        , gamePlayerTurnIndex
+                                        , gameDeck
+                                        , gameMuck
+                                        }
+  | gameState /= Drawing  = Left "Game: Invalid state for drawing"
+  | length to_discard > 5 = Left "Game: Invalid no of cards to discard"
+  | otherwise             = do
+    pti <- maybeToEither "Game: Invalid player id" gamePlayerTurnIndex
+    current_player <-
+      maybeToEither "Game: Invalid player id" $ lookup pti gamePlayers
+    case playerHand current_player of
+      Nothing -> Left "Empty hand"
+      Just current_hand -> do
+        (drawn, new_deck) <- drawCards (length to_discard) gameDeck
+        (discarded, new_hand) <- updateHand drawn to_discard current_hand
+        let new_player = current_player {playerHand = Just new_hand}
+        let new_players = update (Just . const new_player) pti gamePlayers
+        let updated_game =
+              game
+                { gameMuck = discarded ++ gameMuck
+                , gameDeck = new_deck
+                , gamePlayers = new_players
+                }
+        return updated_game
 
--- placeBet = _
-
--- drawNewCard = _
-
--- discardCard = _
 -------------------------------------------------------------------------------
 -- *  utilities
 -------------------------------------------------------------------------------
