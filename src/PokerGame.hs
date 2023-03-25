@@ -23,7 +23,7 @@ import           Test.QuickCheck    (Arbitrary (arbitrary), Gen, vectorOf)
 -------------------------------------------------------------------------------
 -- | Player actions
 data PokerPlayerAction
-  = Bet Int
+  = SmallBlind Int
   | FoldHand
   | Call Int
   | Raise Int
@@ -104,47 +104,11 @@ instance Arbitrary Hand where
 
 instance Show PokerPlayer where
   show :: PokerPlayer -> String
-  show PokerPlayer {..} =
-    "\tPLAYER #" ++
-    show playerId ++
-    " " ++
-    playerName ++
-    "\n" ++ "\tHand: " ++ maybe "empty hand" show playerHand ++ "\n"
+  show = showPlayer
 
 instance Show PokerGame where
   show :: PokerGame -> String
-  show FiveDraw {..} =
-    "------------------------------------\n" ++
-    "------| POKER GAME DETAILS |------- \n" ++
-    "------------------------------------\n" ++
-    "Current state : " ++
-    show gameState ++
-    "\n" ++
-    "Game settings: " ++
-    show gameSettings ++
-    "\n" ++
-    "Dealer: " ++
-    maybe "Not set" playerName (flip lookup gamePlayers =<< gameDealerIndex) ++
-    "\n" ++
-    "Player turn: " ++
-    maybe "Not set" playerName (flip lookup gamePlayers =<< gamePlayerTurnIndex) ++
-    "\n" ++
-    "Deck :" ++
-    show gameDeck ++
-    "\n" ++
-    "Muck :" ++
-    show gameMuck ++
-    "\n" ++
-    "Bets :" ++
-    show (toList gamePlayersBets) ++
-    "\n" ++
-    "Chips :" ++
-    show (toList gamePlayersChips) ++
-    "\n" ++
-    "Players :\n" ++
-    "------------------------------------\n" ++
-    intercalate "\n" (show <$> toList gamePlayers) ++
-    "\n" ++ "------------------------------------"
+  show = showGame
 
 -------------------------------------------------------------------------------
 -- * Hand function
@@ -229,7 +193,7 @@ initPokerGame perm minBet psToStart = do
 -- | Function to add a player to a game.
 addPlayerToGame :: String -> Int -> Int -> PokerGame -> Either String PokerGame
 addPlayerToGame p_name p_chips p_nonce game@FiveDraw {..}
-  | gameState /= NotStarted = Left "Game: Invalid state for adding new player"
+  | gameState /= NotStarted               = Left "Game: Invalid state for adding new player"
   | p_chips < settingsMinBet gameSettings = Left "Game: Invalid chips value"
   | otherwise =
     let p_id = size gamePlayers
@@ -283,9 +247,9 @@ postBlinds game@FiveDraw {..}
     Left $ "Game: Invalid state for posting blinds: " ++ show gameState
   | otherwise =
     let min_bet = settingsMinBet gameSettings
-     in playerBettingAction (Bet min_bet) =<<
+     in playerBettingAction (SmallBlind min_bet) =<<
         playerBettingAction
-          (Bet min_bet)
+          (SmallBlind min_bet)
           game {gameState = PostingBlinds, gameMaxBet = Just min_bet}
 
 
@@ -317,8 +281,8 @@ playerBettingAction action game@FiveDraw {..}
   | gameState `notElem` [FirstBetRound, SecondBetRound, PostingBlinds] =
     Left $ "Game: Invalid State for Betting Action" ++ show gameState
   | otherwise = do
-    pti <- maybeToEither "error" gamePlayerTurnIndex
-    p_chips <- maybeToEither "Invalid player id" $ lookup pti gamePlayersChips
+    pti <- getCurrentPlayerId game
+    p_chips <- getCurrentPlayerChips game
     if actionVal action > p_chips
       then Left "Invalid action"
       else return
@@ -334,20 +298,18 @@ playerBettingAction action game@FiveDraw {..}
 -- Returns the game with updated players data, gameBets, maybe gameMuck and gameMinBet
 roundBettingAction :: PokerPlayerAction -> PokerGame -> Either String PokerGame
 roundBettingAction action game@FiveDraw {..} = do
-  pti <- maybeToEither "Invalid player turn" gamePlayerTurnIndex
-  current_player <- maybeToEither "Invalid player turn" $ lookup pti gamePlayers
-  current_actions <-
-    maybeToEither "Invalid player turn" $ lookup pti gamePlayersBets
+  pti <- getCurrentPlayerId game
+  current_player <- getCurrentPlayer game
+  current_actions <- getCurrentPlayerBets game
   let current_player_bet = sum $ actionVal <$> current_actions
   chips_bets_turn <- playerBettingAction action game
   updated_game <-
     case action of
-      Bet _ -> Left "Invalid action"
+      SmallBlind _ -> Left $ "Invalid action: " ++ show action
       FoldHand -> do
-        let folded_hand =
-              maybeToEither "Invalid hand" $ playerHand current_player
+        folded_hand <- getCurrentPlayerHand game
         let folded_player = current_player {playerHand = Nothing}
-        folded_cards <- handCards <$> folded_hand
+        let folded_cards = handCards folded_hand
         return $
           chips_bets_turn
             { gamePlayers = update (Just . const folded_player) pti gamePlayers
@@ -397,18 +359,12 @@ isAllIn _         = False
 
 -- | Function to discard and draw for a player. Returns a game with updated state, deck and the player data.
 discardAndDraw :: [Int] -> PokerGame -> Either String PokerGame
-discardAndDraw to_discard game@FiveDraw { gameState
-                                        , gamePlayers
-                                        , gamePlayerTurnIndex
-                                        , gameDeck
-                                        , gameMuck
-                                        }
+discardAndDraw to_discard game@FiveDraw {..}
   | gameState /= Drawing  = Left "Game: Invalid state for drawing"
   | length to_discard > 5 = Left "Game: Invalid no of cards to discard"
   | otherwise             = do
-    pti <- maybeToEither "Game: Invalid player id" gamePlayerTurnIndex
-    current_player <-
-      maybeToEither "Game: Invalid player id" $ lookup pti gamePlayers
+    pti <- getCurrentPlayerId game
+    current_player <- getCurrentPlayer game
     case playerHand current_player of
       Nothing -> Left "Empty hand"
       Just current_hand -> do
@@ -438,8 +394,92 @@ updateList xs i newVal = take i xs ++ [newVal] ++ drop (i + 1) xs
 actionVal :: PokerPlayerAction -> Int
 actionVal action =
   case action of
-    Bet n    -> n
-    FoldHand -> 0
-    Call n   -> n
-    Raise n  -> n
-    AllIn n  -> n
+    SmallBlind n -> n
+    FoldHand     -> 0
+    Call n       -> n
+    Raise n      -> n
+    AllIn n      -> n
+
+---
+--- GAME UTILITIES
+---
+getCurrentPlayer :: PokerGame -> Either String PokerPlayer
+getCurrentPlayer g@FiveDraw {..} = do
+  pti <- getCurrentPlayerId g
+  maybeToEither "Error: Invalid player id" $ lookup pti gamePlayers
+
+getCurrentPlayerName :: PokerGame -> Either String String
+getCurrentPlayerName game = do
+  player <- getCurrentPlayer game
+  return $ playerName player
+
+getCurrentPlayerId :: PokerGame -> Either String Int
+getCurrentPlayerId FiveDraw {..} =
+  maybeToEither "Error: Invalid player id 1" gamePlayerTurnIndex
+
+getCurrentPlayerBets :: PokerGame -> Either String [PokerPlayerAction]
+getCurrentPlayerBets game@FiveDraw {..} = do
+  pti <- getCurrentPlayerId game
+  maybeToEither "Error: Invalid player id 2" $ lookup pti gamePlayersBets
+
+getCurrentPlayerChips :: PokerGame -> Either String Int
+getCurrentPlayerChips game@FiveDraw {..} = do
+  pti <- getCurrentPlayerId game
+  maybeToEither "Error: Invalid player id 3" $ lookup pti gamePlayersChips
+
+getCurrentPlayerHand :: PokerGame -> Either String Hand
+getCurrentPlayerHand game = do
+  player <- getCurrentPlayer game
+  maybeToEither "Invalid hand" $ playerHand player
+
+---
+--- Show
+----
+showPlayer :: PokerPlayer -> String
+showPlayer PokerPlayer {..} =
+  "\tPLAYER #" ++
+  show playerId ++
+  " " ++
+  playerName ++
+  "\n" ++ "\tHand : " ++ maybe "empty hand" show playerHand ++ "\n"
+
+showPlayerInGame :: PokerGame -> Int -> String
+showPlayerInGame FiveDraw {..} p_id =
+  let p_chips = maybe "No bets" show $ lookup p_id gamePlayersChips
+      p_bets = maybe "No bets" show $ lookup p_id gamePlayersBets
+      player = maybe "No player" show  $ lookup p_id gamePlayers
+   in player ++ "\tBets : " ++  p_bets ++ "\n\tChips: " ++ p_chips ++ "\n"
+
+showGame :: PokerGame -> String
+showGame game@FiveDraw {..} =
+  "------------------------------------\n" ++
+  "------| POKER GAME DETAILS |------- \n" ++
+  "------------------------------------\n" ++
+  "Current state : " ++
+  show gameState ++
+  "\n" ++
+  "Game settings: " ++
+  show gameSettings ++
+  "\n" ++
+  "Dealer: " ++
+  maybe "Not set" playerName (flip lookup gamePlayers =<< gameDealerIndex) ++
+  "\n" ++
+  "Player turn: " ++
+  maybe "Not set" playerName (flip lookup gamePlayers =<< gamePlayerTurnIndex) ++
+  "\n" ++
+  "Deck :" ++
+  show gameDeck ++
+  "\n" ++
+  "Muck :" ++
+  show gameMuck ++
+  "\n" ++
+  "Bets :" ++
+  show (toList gamePlayersBets) ++
+  "\n" ++
+  "Chips :" ++
+  show (toList gamePlayersChips) ++
+  "\n" ++
+  "Players :\n" ++
+  "------------------------------------\n" ++
+  intercalate "\n" (showPlayerInGame game <$> keys gamePlayers) ++
+  "\n" ++ "------------------------------------"

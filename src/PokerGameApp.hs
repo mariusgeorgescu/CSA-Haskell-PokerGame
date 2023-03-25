@@ -16,12 +16,17 @@ import           Control.Monad.State       (MonadState, StateT (runStateT),
                                             evalStateT, get, put)
 
 import           Control.Monad.Error.Class (MonadError (throwError))
-import           Control.Monad.Loops       (iterateWhile, iterateUntil)
+import           Control.Monad.Loops       (iterateUntil)
 
+import           Data.Either.Extra         (maybeToEither)
 import           PokerGame                 (GameState (..),
-                                            PokerGame (gamePlayers),
+                                            PokerGame (gamePlayerTurnIndex, gamePlayers),
+                                            PokerPlayer (playerName),
                                             addPlayerToGame, gameState,
-                                            initPokerGame)
+                                            getCurrentPlayer,
+                                            getCurrentPlayerId,
+                                            getCurrentPlayerName, initPokerGame,
+                                            showPlayerInGame)
 import           System.Random             (Random (randomR), RandomGen,
                                             mkStdGen)
 
@@ -93,6 +98,7 @@ testPokerApp :: PokerApp ()
 testPokerApp = do
   initGame
   addPlayers
+  bettingAction
   return ()
 
 initGame :: PokerApp ()
@@ -101,15 +107,17 @@ initGame = do
   playersToStart <- asks envMinPlayers
   let gen = mkStdGen 10
   let permutations = randomList gen 51
-  liftIO $ print "INITIALISING POKER GAME"
+  liftIO $ gameMessage "Initializing the game"
   g <- liftEither $ initPokerGame permutations minBet playersToStart
   liftIO $ print g
   put g
 
 addPlayers :: PokerApp ()
 addPlayers = do
+  liftIO $ gameMessage "Waiting for players to join the game "
   _ <- iterateUntil (== FirstBetRound) addPlayer
   g <- get
+  liftIO $ gameMessage "Setting dealer, posting small blinds and dealing hands"
   liftIO $ print g
 
 addPlayer :: PokerApp GameState
@@ -120,3 +128,29 @@ addPlayer = do
   g1 <- liftEither $ addPlayerToGame name 100 2 g
   put g1
   return $ gameState g1
+
+printCurrentPlayer :: PokerApp ()
+printCurrentPlayer = do
+  game <- get
+  p_id <- liftEither $ getCurrentPlayerId game
+  liftIO $ putStrLn $ showPlayerInGame game p_id
+
+bettingAction :: PokerApp ()
+bettingAction = do
+  liftIO $ gameMessage "Betting Action"
+  liftIO $ print "Player's Turn : "
+  printCurrentPlayer
+  return ()
+
+
+--
+-- Others
+--
+gameMessage :: String -> IO ()
+gameMessage message =
+  let msglen = length message
+      pas = (170 - msglen) `div` 2
+   in putStrLn $
+      "\ESC[92m" ++
+      replicate pas '*' ++
+      "|  " ++ message ++ "  |" ++ replicate pas '*' ++ "\ESC[0m"
