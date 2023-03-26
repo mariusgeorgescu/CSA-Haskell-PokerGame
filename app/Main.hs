@@ -1,9 +1,10 @@
 module Main where
 
-import           PokerGame    
+import           PokerGame
 
-import           PokerGameApp  (runPokerApp, testPokerApp, Env (Env))
+import           PokerGameApp  (Env (Env), runPokerApp, testPokerApp)
 import           System.Random (Random (randomR), RandomGen, newStdGen)
+
 
 -- testRun2 :: [Int] -> Either String PokerGame
 -- testRun2 perms =
@@ -12,7 +13,6 @@ import           System.Random (Random (randomR), RandomGen, newStdGen)
 --   startPokerGame >>=
 --   setDealer 1 >>=
 --   dealHands
-
 randomList :: RandomGen g => g -> Int -> [Int]
 randomList gen n = go gen [0 .. n - 1]
   where
