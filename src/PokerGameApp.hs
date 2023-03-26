@@ -6,38 +6,42 @@
 
 module PokerGameApp where
 
-import           Control.Monad.Except      (ExceptT, MonadError (catchError),
-                                            MonadTrans (lift), liftEither,
-                                            runExceptT)
-import           Control.Monad.Reader      (MonadIO (..),
-                                            MonadReader (ask, local),
-                                            ReaderT (..), asks)
-import           Control.Monad.State       (MonadState, StateT (runStateT),
-                                            evalStateT, get, put)
+import           Control.Monad.Except         (ExceptT, MonadError (catchError),
+                                               MonadTrans (lift), liftEither,
+                                               runExceptT)
+import           Control.Monad.Reader         (MonadIO (..),
+                                               MonadReader (ask, local),
+                                               ReaderT (..), asks)
+import           Control.Monad.State          (MonadState, StateT (runStateT),
+                                               evalStateT, get, put)
 
-import           Control.Monad.Error.Class (MonadError (throwError))
-import           Control.Monad.Loops       (iterateUntil)
+import           Control.Monad.Error.Class    (MonadError (throwError))
+import           Control.Monad.Loops          (iterateUntil)
 
-import           Data.Char                 (toUpper)
-import           Data.Either.Extra         (maybeToEither)
-import           PokerGame                 (GameSettings (settingsMinBet),
-                                            GameState (..),
-                                            PokerGame (gamePlayerTurnIndex, gamePlayers, gameSettings),
-                                            PokerPlayer (PokerPlayer, playerName),
-                                            PokerPlayerAction (Call, FoldHand, Raise),
-                                            addPlayerToGame, gameState,
-                                            getCurrentPlayer,
-                                            getCurrentPlayerId,
-                                            getCurrentPlayerName, initPokerGame,
-                                            playerBettingAction,
-                                            showPlayerInGame, roundBettingAction)
-import           System.Console.Haskeline  (defaultSettings, getInputChar,
-                                            runInputT)
-import           System.Random             (Random (randomR), RandomGen,
-                                            mkStdGen)
-import           Text.Read                 (readEither)
-import Control.Exception (catch)
-import Text.ParserCombinators.ReadP (char)
+import           Control.Exception            (catch)
+import           Data.Char                    (toUpper)
+import           Data.Either.Extra            (maybeToEither)
+import           Data.Validation              (Validate (_Either))
+import           PokerGame                    (GameSettings (settingsMinBet),
+                                               GameState (..),
+                                               PokerGame (gameMaxBet, gamePlayerTurnIndex, gamePlayers, gameSettings),
+                                               PokerPlayer (PokerPlayer, playerName),
+                                               PokerPlayerAction (Call, FoldHand, Raise),
+                                               actionVal, addPlayerToGame,
+                                               gameState, getCurrentPlayer,
+                                               getCurrentPlayerBets,
+                                               getCurrentPlayerId,
+                                               getCurrentPlayerName,
+                                               initPokerGame, isFoldPlayer,
+                                               playerBettingAction,
+                                               roundBettingAction,
+                                               showPlayerInGame)
+import           System.Console.Haskeline     (defaultSettings, getInputChar,
+                                               runInputT)
+import           System.Random                (Random (randomR), RandomGen,
+                                               mkStdGen)
+import           Text.ParserCombinators.ReadP (char)
+import           Text.Read                    (readEither)
 
 data Env =
   Env
@@ -107,7 +111,7 @@ testPokerApp :: PokerApp ()
 testPokerApp = do
   initGame
   addPlayers
-  bettingAction
+  firstBettingRound
   return ()
 
 initGame :: PokerApp ()
@@ -128,36 +132,90 @@ addPlayers = do
   g <- get
   liftIO $ gameMessage "Setting dealer, posting small blinds and dealing hands"
   liftIO $ print g
+  where
+    addPlayerAndReturnState :: PokerApp GameState
+    addPlayerAndReturnState = gameState <$> addPlayer
+    addPlayer :: PokerApp PokerGame
+    addPlayer = do
+      name <- liftIO $ print "Enter your name: " >> getLine
+      liftIO $ print "100 chips by default"
+      g <- get
+      g1 <-
+        catchError
+          (liftEither $ addPlayerToGame name 100 2 g)
+          (handleLocalError addPlayer)
+      put g1
+      return g1
 
-addPlayerAndReturnState :: PokerApp GameState
-addPlayerAndReturnState =  gameState <$> addPlayer
-
-addPlayer :: PokerApp PokerGame
-addPlayer = do
-  name <- liftIO $ print "Enter your name: " >> getLine
-  liftIO $ print "100 chips by default"
-  g <- get
-  g1 <- catchError (liftEither $ addPlayerToGame name 100 2 g) (handleLocalError addPlayer)
-  put g1
-  return g1
-
-printCurrentPlayer :: PokerApp ()
-printCurrentPlayer = do
+firstBettingRound :: PokerApp ()
+firstBettingRound = do
+  liftIO $ gameMessage "First betting round"
+  s <-
+    iterateUntil
+      (`elem` [Drawing, Showdown, EndOfHand])
+      bettingActionAndReturnState
+  liftIO $ print s
   game <- get
-  p_id <- liftEither $ getCurrentPlayerId game
-  liftIO $ putStrLn $ showPlayerInGame game p_id
+  liftIO $ print game
+
+bettingActionAndReturnState :: PokerApp GameState
+bettingActionAndReturnState = gameState <$> bettingAction
 
 bettingAction :: PokerApp PokerGame
 bettingAction = do
   liftIO $ gameMessage "Betting Action"
   liftIO $ putStrLn "Player's Turn : "
   printCurrentPlayer
-  user_action <- getActionFromUser
   game <- get
-  g <- catchError (liftEither (roundBettingAction user_action game)) (handleLocalError bettingAction)
+  liftIO $ print $ "Current max bet is: " ++ show (gameMaxBet game)
+  currentPlayer <- liftEither $ getCurrentPlayer game
+  user_action <-
+    if isFoldPlayer currentPlayer
+      then return Nothing
+      else Just <$> getActionFromUser
+  game <- get
+  g <-
+    catchError
+      (liftEither (roundBettingAction user_action game))
+      (handleLocalError bettingAction)
   put g
   liftIO $ print g
   return g
+  where
+    getActionFromUser :: PokerApp PokerPlayerAction
+    getActionFromUser = do
+      g <- get
+      liftIO $ putStrLn "Choose your action : "
+      liftIO printAvailableActions
+      c <- liftEither . maybeToEither "error" =<< liftIO getCharFromTerminal
+      catchError
+        (liftEither =<< charToAction c)
+        (handleLocalError getActionFromUser)
+    printAvailableActions :: IO ()
+    printAvailableActions =
+      putStrLn
+        "| \ESC[92mC - Call\ESC[0m | \ESC[95mR - Raise\ESC[0m | \ESC[91mF - Fold\ESC[0m | \ESC[92mA - All In\ESC[0m |"
+    charToAction :: Char -> PokerApp (Either String PokerPlayerAction)
+    charToAction c
+      | toUpper c == 'C' = do
+        g <- get
+        valToCall <- liftEither $ maybeToEither "" $ gameMaxBet g
+        let playerBets = sum $ actionVal <$> getCurrentPlayerBets g
+        return $ Right $ Call (valToCall - playerBets)
+      | toUpper c == 'R' = do
+        i <- liftEither =<< liftIO getIntFromTerminal
+        g2 <- get
+        liftIO $ print g2
+        return $ Right $ Raise i
+      | toUpper c == 'F' = return $ Right FoldHand
+      | toUpper c == 'A' = return $ Left "All in not implemented"
+      | otherwise        = return $ Left "Invalid option"
+
+printCurrentPlayer :: PokerApp ()
+printCurrentPlayer = do
+  game <- get
+  p_id <- liftEither $ getCurrentPlayerId game
+  liftIO $ putStrLn $ showPlayerInGame game p_id
 
 
 --
@@ -172,48 +230,14 @@ gameMessage message =
       replicate pas '*' ++
       "|  " ++ message ++ "  |" ++ replicate pas '*' ++ "\ESC[0m"
 
-
 gameErrorMessage :: String -> IO ()
 gameErrorMessage message = putStrLn $ "\ESC[31m" ++ message ++ "\ESC[0m"
 
-
-printAvailableActions :: IO ()
-printAvailableActions =
-  putStrLn
-    "| \ESC[92mC - Call\ESC[0m | \ESC[95mR - Raise\ESC[0m | \ESC[91mF - Fold\ESC[0m | \ESC[92mA - All In\ESC[0m |"
-
-getActionFromUser :: PokerApp PokerPlayerAction
-getActionFromUser = do
-  g <- get
-  liftIO $ putStrLn "Choose your action : "
-  liftIO printAvailableActions
-  c <- liftEither . maybeToEither "error" =<< liftIO getCharFromTerminal
-  catchError (liftEither =<< charToAction c) (handleLocalError getActionFromUser)
-
-
-
 handleLocalError :: PokerApp a -> String -> PokerApp a
 handleLocalError g e = do
-          liftIO $ gameErrorMessage e
-          liftIO $ putStrLn "Try again ... "
-          g
-
-
-
-
-charToAction :: Char -> PokerApp (Either String PokerPlayerAction)
-charToAction c
-  | toUpper c == 'C' = do
-    g <- get
-    return $ Right $ Call (settingsMinBet . gameSettings $ g)
-  | toUpper c == 'R' = do
-    i <- liftEither =<< liftIO getIntFromTerminal
-    g2 <- get
-    liftIO $ print g2
-    return $ Right $ Raise i
-  | toUpper c == 'F' = return $ Right FoldHand
-  | toUpper c == 'A' = return $ Left "All in not implemented"
-  | otherwise        = return $ Left "Invalid option"
+  liftIO $ gameErrorMessage e
+  liftIO $ putStrLn "Try again ... "
+  g
 
 getCharFromTerminal :: IO (Maybe Char)
 getCharFromTerminal =

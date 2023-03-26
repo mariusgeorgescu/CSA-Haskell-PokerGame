@@ -9,12 +9,14 @@ import           Cards              (Card, Deck, drawCards, mkFullDeck,
                                      shuffleDeck)
 
 import           Data.Bifunctor     (Bifunctor (bimap))
+import           Data.Either        (isLeft)
 import           Data.Either.Extra  (maybeToEither)
-import           Data.IntMap        (insert, keys, lookup, size, toList, update)
+import           Data.IntMap        (filterWithKey, insert, keys, lookup, size,
+                                     toList, update)
 import           Data.IntMap.Strict (IntMap, elems, fromList, insertWith)
 import           Data.List          (nub)
 import           Data.List.Extra    (allSame, groupSort, intercalate, partition)
-import           Data.Maybe         (fromMaybe)
+import           Data.Maybe         (fromMaybe, isNothing)
 import           Data.Validation    (Validation (..), toEither)
 import           GHC.Unicode        (isAlpha)
 import           Prelude            hiding (lookup)
@@ -286,7 +288,9 @@ playerBettingAction action game@FiveDraw {..}
     pti <- getCurrentPlayerId game
     p_chips <- getCurrentPlayerChips game
     if actionVal action > p_chips
-      then Left $ "Invalid action : Insufficient chips.\nAvailable chips:" ++ show p_chips ++ " and trying to " ++ show action
+      then Left $
+           "Invalid action : Insufficient chips.\nAvailable chips:" ++
+           show p_chips ++ " and trying to " ++ show action
       else return
              game
                { gamePlayersChips =
@@ -298,35 +302,43 @@ playerBettingAction action game@FiveDraw {..}
 
 -- | Function to apply a betting action to a game.
 -- Returns the game with updated players data, gameBets, maybe gameMuck and gameMinBet
-roundBettingAction :: PokerPlayerAction -> PokerGame -> Either String PokerGame
-roundBettingAction action game@FiveDraw {..} = do
+roundBettingAction ::
+     Maybe PokerPlayerAction -> PokerGame -> Either String PokerGame
+roundBettingAction maybe_action game@FiveDraw {..} = do
   pti <- getCurrentPlayerId game
   current_player <- getCurrentPlayer game
   let current_actions = getCurrentPlayerBets game
   let current_player_bet = sum $ actionVal <$> current_actions
-  chips_bets_turn <- playerBettingAction action game
   updated_game <-
-    case action of
-      SmallBlind _ -> Left $ "Invalid action: " ++ show action
-      FoldHand -> do
-        folded_hand <- getCurrentPlayerHand game
-        let folded_player = current_player {playerHand = Nothing}
-        let folded_cards = handCards folded_hand
+    case maybe_action of
+      Nothing -> do
         return $
-          chips_bets_turn
-            { gamePlayers = update (Just . const folded_player) pti gamePlayers
-            , gameMuck = folded_cards ++ gameMuck
-            }
-      Call n ->
-        if Just (n + current_player_bet) /= gameMaxBet
-          then Left "Invalid call action"
-          else return chips_bets_turn
-      Raise n ->
-        if gameMaxBet >= Just (n + current_player_bet)
-          then Left "Invalid raise action"
-          else return
-                 chips_bets_turn {gameMaxBet = Just (n + current_player_bet)}
-      AllIn _ -> return game
+          game {gamePlayerTurnIndex = Just $ (pti + 1) `mod` size gamePlayers}
+      Just action -> do
+        chips_bets_turn <- playerBettingAction action game
+        case action of
+          SmallBlind _ -> Left $ "Invalid action: " ++ show action
+          FoldHand -> do
+            folded_hand <- getCurrentPlayerHand game
+            let folded_player = current_player {playerHand = Nothing}
+            let folded_cards = handCards folded_hand
+            return $
+              chips_bets_turn
+                { gamePlayers =
+                    update (Just . const folded_player) pti gamePlayers
+                , gameMuck = folded_cards ++ gameMuck
+                }
+          Call n ->
+            if Just (n + current_player_bet) /= gameMaxBet
+              then Left "Invalid call action"
+              else return chips_bets_turn
+          Raise n ->
+            if gameMaxBet >= Just (n + current_player_bet)
+              then Left "Invalid raise action"
+              else return
+                     chips_bets_turn
+                       {gameMaxBet = Just (n + current_player_bet)}
+          AllIn _ -> return game
   checkIfOver updated_game
 
 checkIfOver :: PokerGame -> Either String PokerGame
@@ -339,12 +351,19 @@ checkIfOver game@FiveDraw {..} =
                   else return $ game {gameState = Drawing}
     else return game
   where
-    allPlayersActed = allSame $ length <$> elems gamePlayersBets
-    noNewRaises     = not (any isRaise (head <$> elems gamePlayersBets))
-    remaining       = filter (not . isFold) <$> elems gamePlayersBets
-    allButOneFolded = length remaining == 1
+    noSmallBlinds = filter (not . isSmallBlind) <$> gamePlayersBets
+    noFoldedPlayers =
+      filterWithKey (\_ v -> not (not (null v) && isFold (head v))) noSmallBlinds
+    allPlayersActed =
+      ((&&) <$> allSame <*> ((> 0) . sum)) . elems $ length <$> noFoldedPlayers
+    noNewRaises = length (filterWithKey (\_ v -> not (null v) && ( not . isRaise) (head v)) noFoldedPlayers) <= 1
+    allButOneFolded = length noFoldedPlayers == 1
     allButOneRemainingAllIn =
-      length (filter (not . isAllIn) <$> elems gamePlayersBets) <= 1
+      length (filter (not . isAllIn) <$> noFoldedPlayers) <= 1
+
+
+--- >>> noFoldedPlayers $ toList [(0,[Raise 10]),(1,[FoldHand,SmallBlind 1]),(2,[Call 9,SmallBlind 1])]
+
 
 isRaise :: PokerPlayerAction -> Bool
 isRaise (Raise _) = True
@@ -357,6 +376,13 @@ isFold _        = False
 isAllIn :: PokerPlayerAction -> Bool
 isAllIn (AllIn _) = True
 isAllIn _         = False
+
+isSmallBlind :: PokerPlayerAction -> Bool
+isSmallBlind (SmallBlind _) = True
+isSmallBlind _              = False
+
+isFoldPlayer :: PokerPlayer -> Bool
+isFoldPlayer = isNothing . playerHand
 
 
 -- | Function to discard and draw for a player. Returns a game with updated state, deck and the player data.
