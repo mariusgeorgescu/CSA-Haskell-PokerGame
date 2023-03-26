@@ -49,7 +49,7 @@ instance Ord Combination where
 -------------------------------------------------------------------------------
 -- | This function evaluates a hand to determine the highest combination
 evaluateHand :: Hand -> Combination
-evaluateHand hand = Combination hand_type (concat $ fst <$> groups)
+evaluateHand hand = Combination hand_type (concatMap fst groups)
   where
     cards          = handCards hand
     (ranks, suits) = (,) <$> sort . fmap cardRank <*> fmap cardSuit $ cards

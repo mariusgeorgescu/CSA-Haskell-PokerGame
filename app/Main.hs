@@ -26,5 +26,5 @@ main = do
   putStrLn "Hello, Haskell Poker Game!"
   gen <- newStdGen
   let perms = randomList gen 51
-  let g = initPokerGame perms 10 3
-  either print (flip (runPokerApp (Env 1 3)) testPokerApp) g
+  let g = initPokerGame perms 10 4
+  either print (flip (runPokerApp (Env 1 4)) testPokerApp) g
