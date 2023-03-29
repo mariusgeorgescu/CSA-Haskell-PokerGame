@@ -247,7 +247,7 @@ setDealer game@FiveDraw {..}
       game
         { gameState = DealerSet
         , gameDealerIndex = Just dealer_id
-        , gamePlayerTurnIndex = Just $ (dealer_id + 1) `mod` IM.size gamePlayers
+        , gamePlayerTurnIndex = Just $ succ dealer_id `mod` IM.size gamePlayers
         , gamePlayersBets = mempty
         }
 
@@ -359,7 +359,7 @@ checkIfOver :: PokerGame -> Either String PokerGame
 checkIfOver game@FiveDraw {..} = do
   di <- getDealerIndex game
   pti <- getCurrentPlayerId game
-  let first_player = fromMaybe (di + 1) lastRaisePlayerId
+  let first_player = fromMaybe (succ di) lastRaisePlayerId
   let allPlayersActed = pti == first_player
   let allButOneFolded = (== 1) . IM.size . IM.filter isFoldPlayer $ gamePlayers
   let allButOneRemainingAllIn = False
@@ -391,7 +391,7 @@ nextPlayerTurn game@FiveDraw {..} =
     }
 
 incrementMod :: Int -> Int -> Int
-incrementMod modulus n = (n + 1) `mod` modulus
+incrementMod modulus n = succ n `mod` modulus
 
 isRaise :: PokerPlayerAction -> Bool
 isRaise (Raise _) = True
