@@ -2,6 +2,7 @@
 {-# LANGUAGE InstanceSigs     #-}
 {-# LANGUAGE NamedFieldPuns   #-}
 {-# LANGUAGE RecordWildCards  #-}
+{-# LANGUAGE TypeApplications #-}
 
 module PokerGame where
 
@@ -10,6 +11,7 @@ import           Cards              (Card, Deck, drawCards, mkFullDeck,
 
 import           Control.Monad      (foldM)
 import           Data.Bifunctor     (Bifunctor (bimap))
+import           Data.Coerce        (coerce)
 import           Data.Either.Extra  (maybeToEither)
 import qualified Data.IntMap.Strict as IM (IntMap, filter, fromList, insert,
                                            insertWith, keys, lookup, size,
@@ -78,10 +80,13 @@ data PokerGame =
 -- | Player
 data PokerPlayer =
   PokerPlayer
-    { playerId   :: Int
+    { playerId   :: PlayerID
     , playerName :: String
     , playerHand :: Maybe Hand
     }
+
+newtype PlayerID =
+  PlayerID Int
 
 
 -- | Hand
@@ -147,15 +152,15 @@ updateHand new_cards cards_to_discard FiveCardDrawHand {handCards}
 -------------------------------------------------------------------------------
 {- | Given id, name and no. of chips, constructs a poker player.
 Returns Left if the id or chips are < 0 or the name is empty.-}
-mkPokerPlayer :: Int -> String -> Either String PokerPlayer
+mkPokerPlayer :: PlayerID -> String -> Either String PokerPlayer
 mkPokerPlayer = (toEither .) . mkPokerPlayer'
 
-mkPokerPlayer' :: Int -> String -> Validation String PokerPlayer
+mkPokerPlayer' :: PlayerID -> String -> Validation String PokerPlayer
 mkPokerPlayer' p_id p_name =
   PokerPlayer <$> valid_id <*> valid_name <*> Success Nothing
   where
     valid_id =
-      if p_id < 0
+      if coerce @PlayerID @Int p_id < 0
         then Failure "| Player: Invalid ID"
         else Success p_id
     valid_name =
@@ -205,7 +210,7 @@ addPlayerToGame p_name p_chips p_nonce game@FiveDraw {..}
      in if (p_id + 1) > 5
           then Left "Game: To many players"
           else do
-            player <- mkPokerPlayer p_id p_name
+            player <- mkPokerPlayer (PlayerID p_id) p_name
             if p_id + 1 < settingsMinPlayersToStart gameSettings
               then return
                      game
@@ -512,7 +517,7 @@ getCurrentPlayerHand game = do
 showPlayer :: PokerPlayer -> String
 showPlayer PokerPlayer {..} =
   "\tPLAYER #" ++
-  show playerId ++
+  show (coerce @PlayerID @Int playerId) ++
   " " ++
   playerName ++
   "\n" ++ "\tHand : " ++ maybe "empty hand" show playerHand ++ "\n"

@@ -6,42 +6,33 @@
 
 module PokerGameApp where
 
-import           Control.Monad.Except         (ExceptT, MonadError (catchError),
-                                               MonadTrans (lift), liftEither,
-                                               runExceptT)
-import           Control.Monad.Reader         (MonadIO (..),
-                                               MonadReader (ask, local),
-                                               ReaderT (..), asks)
-import           Control.Monad.State          (MonadState, StateT (runStateT),
-                                               evalStateT, get, put)
+import           Control.Monad.Except      (ExceptT, MonadError (catchError),
+                                            MonadTrans (lift), liftEither,
+                                            runExceptT)
+import           Control.Monad.Reader      (MonadIO (..),
+                                            MonadReader (ask, local),
+                                            ReaderT (..), asks)
+import           Control.Monad.State       (MonadState, StateT (runStateT),
+                                            evalStateT, get, put)
 
-import           Control.Monad.Error.Class    (MonadError (throwError))
-import           Control.Monad.Loops          (iterateUntil)
+import           Control.Monad.Error.Class (MonadError (throwError))
+import           Control.Monad.Loops       (iterateUntil)
 
-import           Control.Exception            (catch)
-import           Data.Char                    (toUpper)
-import           Data.Either.Extra            (maybeToEither)
-import           Data.Validation              (Validate (_Either))
-import           PokerGame                    (GameSettings (settingsMinBet),
-                                               GameState (..),
-                                               PokerGame (gameMaxBet, gamePlayerTurnIndex, gamePlayers, gameSettings),
-                                               PokerPlayer (PokerPlayer, playerName),
-                                               PokerPlayerAction (Call, FoldHand, Raise),
-                                               actionVal, addPlayerToGame,
-                                               gameState, getCurrentPlayer,
-                                               getCurrentPlayerBets,
-                                               getCurrentPlayerId,
-                                               getCurrentPlayerName,
-                                               initPokerGame, isFoldPlayer,
-                                               playerBettingAction,
-                                               roundBettingAction,
-                                               showPlayerInGame)
-import           System.Console.Haskeline     (defaultSettings, getInputChar,
-                                               runInputT)
-import           System.Random                (Random (randomR), RandomGen,
-                                               mkStdGen)
-import           Text.ParserCombinators.ReadP (char)
-import           Text.Read                    (readEither)
+import           Data.Char                 (toUpper)
+import           Data.Either.Extra         (maybeToEither)
+import           PokerGame                 (GameState (..), PokerGame,
+                                            PokerPlayerAction (..), actionVal,
+                                            addPlayerToGame, gameMaxBet,
+                                            gameState, getCurrentPlayer,
+                                            getCurrentPlayerBets,
+                                            getCurrentPlayerId, initPokerGame,
+                                            isFoldPlayer, roundBettingAction,
+                                            showPlayerInGame)
+import           System.Console.Haskeline  (defaultSettings, getInputChar,
+                                            runInputT)
+import           System.Random             (Random (randomR), RandomGen,
+                                            mkStdGen)
+import           Text.Read                 (readEither)
 
 data Env =
   Env
