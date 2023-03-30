@@ -129,9 +129,9 @@ mkHand cards = toEither $ FiveCardDrawHand <$> validateHandCards cards
 
 validateHandCards :: [Card] -> Validation String [Card]
 validateHandCards cards
-  | length cards /= 5       = Failure "| Hand: Wrong no. of cards"
-  | length (nub cards) /= 5 = Failure "| Hand: Contains duplicates"
-  | otherwise               = Success cards
+  | length cards /= 5   = Failure "| Hand: Wrong no. of cards"
+  | hasDuplicates cards = Failure "| Hand: Contains duplicates"
+  | otherwise           = Success cards
 
 
 -- | Given a list up to five cards, a list of indexes and a hand the function replaces the new cards.
@@ -140,7 +140,7 @@ updateHand new_cards cards_to_discard FiveCardDrawHand {handCards}
   | length new_cards > 5 = Left "Hand: Wrong no. of cards to replace"
   | length new_cards /= length cards_to_discard =
     Left "Hand: no. cards to discard different than no. of cards drawn"
-  | length (nub (new_cards ++ handCards)) /= length (new_cards ++ handCards) =
+  | hasDuplicates (new_cards ++ handCards) =
     Left "Hand: Deck contains duplicates"
   | otherwise = do
     let (discarded, remaining) = splitByIndices cards_to_discard handCards
@@ -359,16 +359,26 @@ checkIfOver :: PokerGame -> Either String PokerGame
 checkIfOver game@FiveDraw {..} = do
   di <- getDealerIndex game
   pti <- getCurrentPlayerId game
-  let first_player = fromMaybe (succ di) lastRaisePlayerId
+  let first_player =
+        fromMaybe (incrementMod (length gamePlayers) di) lastRaisePlayerId
   let allPlayersActed = pti == first_player
-  let allButOneFolded = (== 1) . IM.size . IM.filter isFoldPlayer $ gamePlayers
+  let allButOneFolded =
+        (== 1) . IM.size . IM.filter (not . isFoldPlayer) $ gamePlayers
   let allButOneRemainingAllIn = False
   if allPlayersActed
     then if allButOneFolded
            then return game {gameState = EndOfHand}
            else if allButOneRemainingAllIn
                   then return $ game {gameState = Showdown}
-                  else return $ game {gameState = Drawing}
+                  else return $
+                       game
+                         { gameState = Drawing
+                         , gamePlayerTurnIndex =
+                             incrementMod (length gamePlayers) <$>
+                             gameDealerIndex
+                         , lastRaisePlayerId = Nothing --- tbd
+                         , gameMaxBet = Nothing --- tbd
+                         }
     else return game
 
 
@@ -416,25 +426,46 @@ isFoldPlayer = isNothing . playerHand
 -- | Function to discard and draw for a player. Returns a game with updated state, deck and the player data.
 discardAndDraw :: [Int] -> PokerGame -> Either String PokerGame
 discardAndDraw to_discard game@FiveDraw {..}
-  | gameState /= Drawing  = Left "Game: Invalid state for drawing"
-  | length to_discard > 5 = Left "Game: Invalid no of cards to discard"
-  | otherwise             = do
+  | gameState /= Drawing = Left "Game: Invalid state for drawing"
+  | (not . validToDiscard) to_discard =
+    Left "Game: Invalid no of cards to discard"
+  | otherwise = do
     pti <- getCurrentPlayerId game
+    di <- getDealerIndex game
     current_player <- getCurrentPlayer game
-    case playerHand current_player of
-      Nothing -> Left "Empty hand"
-      Just current_hand -> do
-        (drawn, new_deck) <- drawCards (length to_discard) gameDeck
-        (discarded, new_hand) <- updateHand drawn to_discard current_hand
-        let new_player = current_player {playerHand = Just new_hand}
-        let new_players = IM.update (Just . const new_player) pti gamePlayers
-        let updated_game =
-              game
-                { gameMuck = discarded ++ gameMuck
-                , gameDeck = new_deck
-                , gamePlayers = new_players
-                }
-        return updated_game
+    g <-
+      case playerHand current_player of
+        Nothing -> return game
+        Just current_hand -> do
+          (drawn, new_deck) <- drawCards (length to_discard) gameDeck
+          (discarded, new_hand) <- updateHand drawn to_discard current_hand
+          let new_player = current_player {playerHand = Just new_hand}
+          let new_players = IM.update (Just . const new_player) pti gamePlayers
+          let updated_game =
+                game
+                  { gameMuck = discarded ++ gameMuck
+                  , gameDeck = new_deck
+                  , gamePlayers = new_players
+                  }
+          return updated_game
+    let g2 =
+          if checkAllPlayersActed
+               (length gamePlayers)
+               pti
+               (incrementMod (length gamePlayers) di)
+            then g {gameState = SecondBetRound}
+            else g
+    return (nextPlayerTurn g2)
+
+validToDiscard :: [Int] -> Bool
+validToDiscard xs
+  | length xs >= 3   = False
+  | hasDuplicates xs = False
+  | any (> 5) xs     = False
+  | otherwise        = True
+
+hasDuplicates :: Eq a => [a] -> Bool
+hasDuplicates = (/=) <$> length <*> (length . nub)
 
 -------------------------------------------------------------------------------
 -- *  utilities
@@ -482,6 +513,15 @@ getCurrentPlayerId FiveDraw {..} =
 getDealerIndex :: PokerGame -> Either String Int
 getDealerIndex FiveDraw {..} =
   maybeToEither "Error: Dealer not set" gameDealerIndex
+
+getSmallBlindIndex :: PokerGame -> Either String Int
+getSmallBlindIndex g@FiveDraw {..} = do
+  di <- getDealerIndex g
+  return $ incrementMod (length gamePlayers) di
+
+getNoOfActivePlayers :: PokerGame ->Int
+getNoOfActivePlayers FiveDraw {..} = length $ IM.filter (isNothing . playerHand) gamePlayers
+
 
 checkSmallBlind :: Int -> Int -> Int -> Bool
 checkSmallBlind d p l =

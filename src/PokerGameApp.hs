@@ -18,13 +18,16 @@ import           Control.Monad.State       (MonadState, StateT (runStateT),
 import           Control.Monad.Error.Class (MonadError (throwError))
 import           Control.Monad.Loops       (iterateUntil)
 
+import           Control.Monad             (replicateM)
 import           Data.Char                 (toUpper)
 import           Data.Either.Extra         (maybeToEither)
 import           PokerGame                 (GameState (..), PokerGame,
                                             PokerPlayerAction (..), actionVal,
-                                            addPlayerToGame, gameMaxBet,
-                                            gameState, getCurrentPlayer,
+                                            addPlayerToGame, discardAndDraw,
+                                            gameMaxBet, gameState,
+                                            getCurrentPlayer,
                                             getCurrentPlayerBets,
+                                            getCurrentPlayerHand,
                                             getCurrentPlayerId, initPokerGame,
                                             isFoldPlayer, roundBettingAction,
                                             showPlayerInGame)
@@ -103,6 +106,7 @@ testPokerApp = do
   initGame
   addPlayers
   firstBettingRound
+  drawingRound
   return ()
 
 initGame :: PokerApp ()
@@ -194,7 +198,7 @@ bettingAction = do
         let playerBets = sum $ actionVal <$> getCurrentPlayerBets g
         return $ Right $ Call (valToCall - playerBets)
       | toUpper c == 'R' = do
-        i <- liftEither =<< liftIO getIntFromTerminal
+        i <- liftEither =<< liftIO (getIntFromTerminal "Enter amount")
         g2 <- get
         liftIO $ print g2
         return $ Right $ Raise i
@@ -234,7 +238,48 @@ getCharFromTerminal :: IO (Maybe Char)
 getCharFromTerminal =
   runInputT defaultSettings (getInputChar "Type your option and press enter: ")
 
-getIntFromTerminal :: IO (Either String Int)
-getIntFromTerminal = do
-  print "Enter amount: "
+getIntFromTerminal :: String -> IO (Either String Int)
+getIntFromTerminal msg = do
+  print msg
   readEither <$> getLine
+
+
+--------------------------------------
+drawingAction :: PokerApp PokerGame
+drawingAction = do
+  liftIO $ gameMessage "Drawing Action"
+  game <- get
+  p_id <- liftEither $ getCurrentPlayerId game
+  liftIO $ putStrLn $ "Player's Turn : " ++ show p_id
+  liftIO $ print $ getCurrentPlayerHand game
+  player <- liftEither $ getCurrentPlayer game
+  if isFoldPlayer player
+    then do 
+      g <- liftEither $ discardAndDraw [] game
+      put g
+      return g
+    else do
+      to_discard <- getCardsToDiscard
+      g <-
+        catchError
+          (liftEither $ discardAndDraw to_discard game)
+          (handleLocalError drawingAction)
+      put g
+      return g
+
+
+getCardsToDiscard :: PokerApp [Int]
+getCardsToDiscard = return [0,1] -- TO Do
+
+
+
+drawingActionAndReturnState :: PokerApp GameState
+drawingActionAndReturnState = gameState <$> drawingAction
+
+drawingRound :: PokerApp ()
+drawingRound = do
+  liftIO $ gameMessage "Drawing round"
+  s <- iterateUntil (== SecondBetRound) drawingActionAndReturnState
+  liftIO $ print s
+  game <- get
+  liftIO $ print game
