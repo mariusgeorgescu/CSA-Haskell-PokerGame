@@ -24,4 +24,7 @@ cabal.project.local~
 .HTF/
 .ghc.environment.*
 .vscode
-
+# Ignore vim files:
+*~
+*.swp
+*.swo

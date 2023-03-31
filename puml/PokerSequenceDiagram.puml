@@ -20,4 +20,4 @@ PokerGame -> PokerGame : Turn betting round
 PokerGame -> PokerGame : Deal River
 PokerGame -> PokerGame : River betting round
 PokerGame -> PokerGame : Shutdown
-
+@enduml
