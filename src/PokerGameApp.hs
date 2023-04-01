@@ -18,8 +18,7 @@ import           Control.Monad.State       (MonadState, StateT (runStateT),
 import           Control.Monad.Error.Class (MonadError (throwError))
 import           Control.Monad.Loops       (iterateUntil)
 
-import           Control.Monad             (replicateM)
-import           Data.Char                 (toUpper)
+import           Data.Char                 (digitToInt, toUpper)
 import           Data.Either.Extra         (maybeToEither)
 import           PokerGame                 (GameState (..), PokerGame,
                                             PokerPlayerAction (..), actionVal,
@@ -168,10 +167,10 @@ bettingAction = do
     if isFoldPlayer currentPlayer
       then return Nothing
       else Just <$> getActionFromUser
-  game <- get
+  game2 <- get
   g <-
     catchError
-      (liftEither (roundBettingAction user_action game))
+      (liftEither (roundBettingAction user_action game2))
       (handleLocalError bettingAction)
   put g
   liftIO $ print g
@@ -179,7 +178,6 @@ bettingAction = do
   where
     getActionFromUser :: PokerApp PokerPlayerAction
     getActionFromUser = do
-      g <- get
       liftIO $ putStrLn "Choose your action : "
       liftIO printAvailableActions
       c <- liftEither . maybeToEither "error" =<< liftIO getCharFromTerminal
@@ -254,7 +252,7 @@ drawingAction = do
   liftIO $ print $ getCurrentPlayerHand game
   player <- liftEither $ getCurrentPlayer game
   if isFoldPlayer player
-    then do 
+    then do
       g <- liftEither $ discardAndDraw [] game
       put g
       return g
@@ -267,11 +265,12 @@ drawingAction = do
       put g
       return g
 
-
 getCardsToDiscard :: PokerApp [Int]
-getCardsToDiscard = return [0,1] -- TO Do
-
-
+getCardsToDiscard = do
+  liftIO $ print "enter indexes of cards to discard: "
+  line <- liftIO getLine
+  let ints = digitToInt <$> line
+  catchError (pure ints) (handleLocalError getCardsToDiscard)
 
 drawingActionAndReturnState :: PokerApp GameState
 drawingActionAndReturnState = gameState <$> drawingAction

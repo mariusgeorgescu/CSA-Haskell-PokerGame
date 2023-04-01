@@ -427,9 +427,8 @@ isFoldPlayer = isNothing . playerHand
 discardAndDraw :: [Int] -> PokerGame -> Either String PokerGame
 discardAndDraw to_discard game@FiveDraw {..}
   | gameState /= Drawing = Left "Game: Invalid state for drawing"
-  | (not . validToDiscard) to_discard =
-    Left "Game: Invalid no of cards to discard"
-  | otherwise = do
+  | otherwise            = do
+    to_discard_valid <- (toEither . checkIfValidToDiscard) to_discard
     pti <- getCurrentPlayerId game
     di <- getDealerIndex game
     current_player <- getCurrentPlayer game
@@ -437,8 +436,9 @@ discardAndDraw to_discard game@FiveDraw {..}
       case playerHand current_player of
         Nothing -> return game
         Just current_hand -> do
-          (drawn, new_deck) <- drawCards (length to_discard) gameDeck
-          (discarded, new_hand) <- updateHand drawn to_discard current_hand
+          (drawn, new_deck) <- drawCards (length to_discard_valid) gameDeck
+          (discarded, new_hand) <-
+            updateHand drawn to_discard_valid current_hand
           let new_player = current_player {playerHand = Just new_hand}
           let new_players = IM.update (Just . const new_player) pti gamePlayers
           let updated_game =
@@ -457,12 +457,25 @@ discardAndDraw to_discard game@FiveDraw {..}
             else g
     return (nextPlayerTurn g2)
 
-validToDiscard :: [Int] -> Bool
-validToDiscard xs
-  | length xs >= 3   = False
-  | hasDuplicates xs = False
-  | any (> 5) xs     = False
-  | otherwise        = True
+checkIfValidToDiscard :: [Int] -> Validation String [Int]
+checkIfValidToDiscard xs = correctLength *> noDuplicates *> noOutOfRange
+  where
+    correctLength =
+      if length xs > 3
+        then Failure $
+             "Player: Invalid no. of cards to discard: " ++
+             (show . length) xs ++ " | "
+        else Success xs
+    noDuplicates =
+      if hasDuplicates xs
+        then Failure $
+             "Player: Cannnot discard same card more than once: " ++
+             show xs ++ " | "
+        else Success xs
+    noOutOfRange =
+      if any (>= 5) xs
+        then Failure $ "Player: Invalid card index" ++ " | "
+        else Success xs
 
 hasDuplicates :: Eq a => [a] -> Bool
 hasDuplicates = (/=) <$> length <*> (length . nub)
@@ -519,9 +532,9 @@ getSmallBlindIndex g@FiveDraw {..} = do
   di <- getDealerIndex g
   return $ incrementMod (length gamePlayers) di
 
-getNoOfActivePlayers :: PokerGame ->Int
-getNoOfActivePlayers FiveDraw {..} = length $ IM.filter (isNothing . playerHand) gamePlayers
-
+getNoOfActivePlayers :: PokerGame -> Int
+getNoOfActivePlayers FiveDraw {..} =
+  length $ IM.filter (isNothing . playerHand) gamePlayers
 
 checkSmallBlind :: Int -> Int -> Int -> Bool
 checkSmallBlind d p l =
