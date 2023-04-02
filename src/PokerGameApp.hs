@@ -27,8 +27,9 @@ import           PokerGame                 (GameState (..), PokerGame,
                                             getCurrentPlayer,
                                             getCurrentPlayerBets,
                                             getCurrentPlayerHand,
-                                            getCurrentPlayerId, initPokerGame,
-                                            isFoldPlayer, roundBettingAction,
+                                            getCurrentPlayerId, isFoldPlayer,
+                                            mkFiveCardDrawPokerGame,
+                                            mkGameSettings, roundBettingAction,
                                             showPlayerInGame)
 import           System.Console.Haskeline  (defaultSettings, getInputChar,
                                             runInputT)
@@ -106,6 +107,7 @@ testPokerApp = do
   addPlayers
   firstBettingRound
   drawingRound
+  secondBettingRound
   return ()
 
 initGame :: PokerApp ()
@@ -115,7 +117,8 @@ initGame = do
   let gen = mkStdGen 10
   let permutations = randomList gen 51
   liftIO $ gameMessage "Initializing the game"
-  g <- liftEither $ initPokerGame permutations minBet playersToStart
+  gs <- liftEither $ mkGameSettings minBet playersToStart
+  let g = mkFiveCardDrawPokerGame gs
   liftIO $ print g
   put g
 
@@ -148,6 +151,14 @@ firstBettingRound = do
     iterateUntil
       (`elem` [Drawing, Showdown, EndOfHand])
       bettingActionAndReturnState
+  liftIO $ print s
+  game <- get
+  liftIO $ print game
+
+secondBettingRound :: PokerApp ()
+secondBettingRound = do
+  liftIO $ gameMessage "2nd betting round"
+  s <- iterateUntil (`elem` [Showdown, EndOfHand]) bettingActionAndReturnState
   liftIO $ print s
   game <- get
   liftIO $ print game

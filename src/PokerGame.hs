@@ -6,13 +6,14 @@
 
 module PokerGame where
 
-import           Cards              (Card, Deck, drawCards, mkFullDeck,
-                                     shuffleDeck)
+import           Cards              (Card, Deck, drawCards, mkFullDeck)
 
 import           Control.Monad      (foldM)
 import           Data.Bifunctor     (Bifunctor (bimap))
 import           Data.Coerce        (coerce)
+import           Data.Default
 import           Data.Either.Extra  (maybeToEither)
+import           Data.Foldable      (Foldable (foldr'))
 import qualified Data.IntMap.Strict as IM (IntMap, filter, fromList, insert,
                                            insertWith, keys, lookup, size,
                                            toList, update)
@@ -36,9 +37,9 @@ data PokerPlayerAction
   deriving (Show)
 
 
--- | Game Params
-data GameSettings =
-  GameSettings
+-- | Game Parameters
+data PokerGameSettings =
+  PokerGameSettings
     { settingsMinBet            :: Int -- ^ Minimum bet value
     , settingsMinPlayersToStart :: Int -- ^ Minimum no of players to start the game
     }
@@ -64,7 +65,7 @@ data PokerGame =
   FiveDraw
     { gameState           :: GameState
     , gameDeck            :: Deck
-    , gameSettings        :: GameSettings
+    , gameSettings        :: PokerGameSettings
     , gamePlayers         :: IM.IntMap PokerPlayer
     , gameMuck            :: [Card]
     , gameDealerIndex     :: Maybe Int
@@ -118,6 +119,10 @@ instance Show PokerPlayer where
 instance Show PokerGame where
   show :: PokerGame -> String
   show = showGame
+
+instance Default PokerGameSettings
+ where
+  def = PokerGameSettings {settingsMinBet = 1, settingsMinPlayersToStart = 2}
 
 -------------------------------------------------------------------------------
 -- * Hand function
@@ -173,31 +178,36 @@ mkPokerPlayer' p_id p_name =
 -------------------------------------------------------------------------------
 
 -- | Function to initate a PokerGame
-initPokerGame :: [Int] -> Int -> Int -> Either String PokerGame
-initPokerGame perm minBet psToStart = do
-  deck <- shuffleDeck perm mkFullDeck
-  gs <- toEither mkGameSettings
-  Right $
-    FiveDraw
-      NotStarted
-      deck
-      gs
-      mempty
-      mempty
-      Nothing
-      Nothing
-      mempty
-      mempty
-      mempty
-      Nothing
-      Nothing
-  where
-    mkGameSettings :: Validation String GameSettings
-    mkGameSettings
-      | minBet < 1 = Failure "GameSettings: invalid minimum bet"
-      | (||) <$> (< 2) <*> (> 5) $ psToStart =
-        Failure "GameSettings: invalid no of players"
-      | otherwise = Success $ GameSettings minBet psToStart
+initPokerGame :: Int -> Int -> Either String PokerGame
+initPokerGame i j = do
+  gs <- mkGameSettings i j
+  return $ mkFiveCardDrawPokerGame gs
+
+mkFiveCardDrawPokerGame :: PokerGameSettings -> PokerGame
+mkFiveCardDrawPokerGame settings =
+  FiveDraw
+    NotStarted
+    mkFullDeck
+    settings
+    mempty
+    mempty
+    Nothing
+    Nothing
+    mempty
+    mempty
+    mempty
+    Nothing
+    Nothing
+
+mkGameSettings :: Int -> Int -> Either String PokerGameSettings
+mkGameSettings = (toEither .) . mkGameSettings'
+
+mkGameSettings' :: Int -> Int -> Validation String PokerGameSettings
+mkGameSettings' minBet psToStart
+  | minBet < 1 = Failure "GameSettings: invalid minimum bet"
+  | (||) <$> (< 2) <*> (> 5) $ psToStart =
+    Failure "GameSettings: invalid no of players"
+  | otherwise = Success $ PokerGameSettings minBet psToStart
 
 
 -- | Function to add a player to a game.
@@ -211,30 +221,19 @@ addPlayerToGame p_name p_chips p_nonce game@FiveDraw {..}
           then Left "Game: To many players"
           else do
             player <- mkPokerPlayer (PlayerID p_id) p_name
+            let gameWithPlayer = addPlayer player p_chips p_nonce game
             if p_id + 1 < settingsMinPlayersToStart gameSettings
-              then return
-                     game
-                       { gamePlayers = IM.insert p_id player gamePlayers
-                       , gamePlayersNonce =
-                           IM.insert p_id p_nonce gamePlayersNonce
-                       , gamePlayersChips =
-                           IM.insert p_id p_chips gamePlayersChips
-                       }
-              else do
-                let gameWithPlayer =
-                      game
-                        { gamePlayers = IM.insert p_id player gamePlayers
-                        , gamePlayersNonce =
-                            IM.insert p_id p_nonce gamePlayersNonce
-                        , gamePlayersChips =
-                            IM.insert p_id p_chips gamePlayersChips
-                        }
-                setDealer gameWithPlayer >>= postBlinds >>= dealHands
+              then return gameWithPlayer
+              else setDealer gameWithPlayer >>= postBlinds >>= dealHands
 
-determineDealer :: PokerGame -> Either String Int
-determineDealer FiveDraw {..}
-  | gameState /= NotStarted = Left "Game: Invalid state to set dealer"
-  | otherwise               = Right $ sum gamePlayersNonce `mod` IM.size gamePlayersNonce
+addPlayer :: PokerPlayer -> Int -> Int -> PokerGame -> PokerGame
+addPlayer player p_chips p_nonce game@FiveDraw {..} =
+  let p_id = IM.size gamePlayers
+   in game
+        { gamePlayers = IM.insert p_id player gamePlayers
+        , gamePlayersChips = IM.insert p_id p_chips gamePlayersChips
+        , gamePlayersNonce = IM.insert p_id p_nonce gamePlayersNonce
+        }
 
 
 -- | Function to set the dealer of a poker game.
@@ -242,7 +241,7 @@ setDealer :: PokerGame -> Either String PokerGame
 setDealer game@FiveDraw {..}
   | gameState /= NotStarted = Left "Game: Invalid state to set dealer"
   | otherwise               = do
-    dealer_id <- determineDealer game
+    let dealer_id = sum gamePlayersNonce `mod` IM.size gamePlayersNonce
     return $
       game
         { gameState = DealerSet
@@ -345,7 +344,7 @@ roundBettingAction maybe_action game@FiveDraw {..} = do
                   then Left "Invalid call action"
                   else return chips_bets_turn
               Raise n ->
-                if settingsMinBet gameSettings >= (n + current_player_bet)
+                if Just (n + current_player_bet) <= gameMaxBet
                   then Left "Invalid raise action"
                   else return
                          chips_bets_turn
@@ -372,12 +371,15 @@ checkIfOver game@FiveDraw {..} = do
                   then return $ game {gameState = Showdown}
                   else return $
                        game
-                         { gameState = Drawing
+                         { gameState =
+                             if gameState == FirstBetRound
+                               then Drawing
+                               else Showdown
                          , gamePlayerTurnIndex =
                              incrementMod (length gamePlayers) <$>
                              gameDealerIndex
                          , lastRaisePlayerId = Nothing --- tbd
-                         , gameMaxBet = Nothing --- tbd
+                         , gameMaxBet = Just (settingsMinBet gameSettings)
                          }
     else return game
 
@@ -564,6 +566,10 @@ getCurrentPlayerHand game = do
   player <- getCurrentPlayer game
   maybeToEither "Invalid hand" $ playerHand player
 
+getCurrentRoundPot :: PokerGame -> Int
+getCurrentRoundPot FiveDraw {..} =
+  foldr' ((+) . (sum . fmap actionVal)) 0 gamePlayersBets
+
 ---
 --- Show
 ----
@@ -591,7 +597,10 @@ showGame game@FiveDraw {..} =
   show gameState ++
   "\n" ++
   "Game settings: " ++
-  show gameSettings ++
+  "Minimum bet: " ++
+  show (settingsMinBet gameSettings) ++
+  " Max Players: " ++
+  show (settingsMinPlayersToStart gameSettings) ++
   "\n" ++
   "Dealer: " ++
   maybe "Not set" playerName (flip IM.lookup gamePlayers =<< gameDealerIndex) ++
