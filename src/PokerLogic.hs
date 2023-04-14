@@ -5,7 +5,7 @@ module PokerLogic where
 import           Cards         (Card (..), Rank (..), Suit)
 import           Data.Function (on)
 import           Data.List     (group, sort, sortBy)
-import           PokerGame     (Hand (..))
+
 
 -------------------------------------------------------------------------------
 -- * Declarations
@@ -48,10 +48,9 @@ instance Ord Combination where
 -- * Evaluate hand
 -------------------------------------------------------------------------------
 -- | This function evaluates a hand to determine the highest combination
-evaluateHand :: Hand -> Combination
-evaluateHand hand = Combination hand_type (concatMap fst groups)
+evaluateHand :: [Card] -> Combination
+evaluateHand cards = Combination hand_type (concatMap fst groups)
   where
-    cards          = handCards hand
     (ranks, suits) = (,) <$> sort . fmap cardRank <*> fmap cardSuit $ cards
     groups         = groupRanks ranks
     no_groups      = length groups

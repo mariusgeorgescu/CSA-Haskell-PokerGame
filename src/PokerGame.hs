@@ -9,19 +9,22 @@ module PokerGame where
 import           Cards              (Card, Deck, drawCards, mkFullDeck)
 
 import           Control.Monad      (foldM)
-import           Data.Bifunctor     (Bifunctor (bimap))
+import           Data.Bifunctor     (Bifunctor (bimap, second))
 import           Data.Coerce        (coerce)
 import           Data.Default
 import           Data.Either.Extra  (maybeToEither)
 import           Data.Foldable      (Foldable (foldr'))
-import qualified Data.IntMap.Strict as IM (IntMap, filter, fromList, insert,
-                                           insertWith, keys, lookup, size,
-                                           toList, update)
-import           Data.List          (nub)
+import           Data.Function      (on)
+import qualified Data.IntMap.Strict as IM (IntMap, filter, foldrWithKey,
+                                           fromList, insert, insertWith, keys,
+                                           lookup, mapMaybe, size, toList,
+                                           update)
+import           Data.List          (nub, sortOn)
 import           Data.List.Extra    (groupSort, intercalate, partition)
-import           Data.Maybe         (fromMaybe, isNothing)
+import           Data.Maybe         (catMaybes, fromMaybe, isNothing)
 import           Data.Validation    (Validation (..), toEither)
 import           GHC.Unicode        (isAlpha)
+import           PokerLogic         (Combination, evaluateHand)
 import           Test.QuickCheck    (Arbitrary (arbitrary), Gen, vectorOf)
 
 -------------------------------------------------------------------------------
@@ -481,6 +484,10 @@ checkIfValidToDiscard xs = correctLength *> noDuplicates *> noOutOfRange
 
 hasDuplicates :: Eq a => [a] -> Bool
 hasDuplicates = (/=) <$> length <*> (length . nub)
+
+determineWinner FiveDraw {..} = reverse  $ sortOn snd $
+  second (fmap (evaluateHand . handCards) . playerHand) <$>
+  IM.toList gamePlayers
 
 -------------------------------------------------------------------------------
 -- *  utilities

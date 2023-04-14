@@ -30,7 +30,7 @@ import           PokerGame                 (GameState (..), PokerGame,
                                             getCurrentPlayerId, isFoldPlayer,
                                             mkFiveCardDrawPokerGame,
                                             mkGameSettings, roundBettingAction,
-                                            showPlayerInGame)
+                                            showPlayerInGame, determineWinner)
 import           System.Console.Haskeline  (defaultSettings, getInputChar,
                                             runInputT)
 import           System.Random             (Random (randomR), RandomGen,
@@ -108,6 +108,9 @@ testPokerApp = do
   firstBettingRound
   drawingRound
   secondBettingRound
+  g <- get 
+  let w = determineWinner g
+  liftIO $ print w
   return ()
 
 initGame :: PokerApp ()
