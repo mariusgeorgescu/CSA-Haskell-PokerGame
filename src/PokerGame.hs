@@ -14,14 +14,13 @@ import           Data.Coerce        (coerce)
 import           Data.Default
 import           Data.Either.Extra  (maybeToEither)
 import           Data.Foldable      (Foldable (foldr'))
-import           Data.Function      (on)
-import qualified Data.IntMap.Strict as IM (IntMap, filter, foldrWithKey,
-                                           fromList, insert, insertWith, keys,
-                                           lookup, mapMaybe, size, toList,
-                                           update)
+import qualified Data.IntMap.Strict as IM (IntMap, filter, fromList, insert,
+                                           insertWith, keys, lookup, size,
+                                           toList, update)
 import           Data.List          (nub, sortOn)
 import           Data.List.Extra    (groupSort, intercalate, partition)
-import           Data.Maybe         (catMaybes, fromMaybe, isNothing)
+import           Data.Maybe         (fromMaybe, isNothing)
+import           Data.Ord           (Down (Down))
 import           Data.Validation    (Validation (..), toEither)
 import           GHC.Unicode        (isAlpha)
 import           PokerLogic         (Combination, evaluateHand)
@@ -483,11 +482,14 @@ checkIfValidToDiscard xs = correctLength *> noDuplicates *> noOutOfRange
         else Success xs
 
 hasDuplicates :: Eq a => [a] -> Bool
-hasDuplicates = (/=) <$> length <*> (length . nub)
+hasDuplicates =  (/=) <$> length <*> (length . nub)
 
-determineWinner FiveDraw {..} = reverse  $ sortOn snd $
-  second (fmap (evaluateHand . handCards) . playerHand) <$>
-  IM.toList gamePlayers
+determineWinner :: PokerGame -> [(Int, Maybe Combination)]
+determineWinner FiveDraw {..} =
+  sortOn
+    (Data.Ord.Down . snd)
+    (second (fmap (evaluateHand . handCards) . playerHand) <$>
+     IM.toList gamePlayers)
 
 -------------------------------------------------------------------------------
 -- *  utilities

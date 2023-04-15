@@ -179,6 +179,15 @@ pokerHandCompareTestSuite =
             (evaluateHand . handCards <$> h1)
             (evaluateHand . handCards <$> h2) `shouldBe`
             EQ
+      describe "Test that one pair of Aces beats One pair of Kings:" $ do
+        it
+          "Input: [Ah, Ac, 5d, 9s, Jh] vs. [Kd, Ks, 5h, 9c, Jd] Expected output: Equal" $ do
+          let h1 = mkHand (["Ah", "Ac", "5d", "9s", "Jh"] :: [Card])
+          let h2 = mkHand (["Kd", "Ks", "5h", "9c", "Jd"] :: [Card])
+          compare
+            (evaluateHand . handCards <$> h1)
+            (evaluateHand . handCards <$> h2) `shouldBe`
+            GT
       describe "Test that two identical two pair hands are equal:" $ do
         it
           "Input: [3h, 3c, 5d, 5s, Jh] vs. [3d, 3s, 5h, 5c, Jd] Expected output: Equal" $ do
