@@ -1,11 +1,11 @@
-{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE InstanceSigs    #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module PokerLogic where
 
 import           Cards         (Card (..), Rank (..), Suit)
 import           Data.Function (on)
 import           Data.List     (group, sort, sortBy)
-import           PokerGame     (Hand (..))
 
 -------------------------------------------------------------------------------
 -- * Declarations
@@ -31,9 +31,14 @@ data Combination =
     { combHandRank  :: HandRank -- ^ rank of the hand
     , combStructure :: [Rank] -- ^ card ranks that indicate combination strength
     }
-  deriving (Eq, Show)
+  deriving (Eq)
 
--------------------------------------------------------------------------------
+instance Show Combination where
+  show :: Combination -> String
+  show Combination {..} = show combHandRank ++ " " ++ show combStructure
+
+---------------------------------------
+----------------------------------------
 --  Instances
 -------------------------------------------------------------------------------
 instance Ord Combination where
@@ -48,10 +53,9 @@ instance Ord Combination where
 -- * Evaluate hand
 -------------------------------------------------------------------------------
 -- | This function evaluates a hand to determine the highest combination
-evaluateHand :: Hand -> Combination
-evaluateHand hand = Combination hand_type (concatMap fst groups)
+evaluateHand :: [Card] -> Combination
+evaluateHand cards = Combination hand_type (concatMap fst groups)
   where
-    cards          = handCards hand
     (ranks, suits) = (,) <$> sort . fmap cardRank <*> fmap cardSuit $ cards
     groups         = groupRanks ranks
     no_groups      = length groups
@@ -59,7 +63,7 @@ evaluateHand hand = Combination hand_type (concatMap fst groups)
       | no_groups == 5 =
         case (isFlush suits, isStraight ranks) of
           (True, True) ->
-            if ranks == [Ace, Ten, Jack, Queen, King]
+            if ranks == [Ten, Jack, Queen, King, Ace]
               then RoyalFlush
               else StraightFlush
           (True, False) -> Flush
@@ -99,7 +103,7 @@ isConsecutive list@(x:_) = sort list == take 5 [x ..]
 
 -- | Given a @[Rank]@, returns @True@ if the list contains exactly 5 ranks which form a @Straight@.
 isStraight :: [Rank] -> Bool
-isStraight [Ace, Ten, Jack, Queen, King] = True
+isStraight [Ten, Jack, Queen, King, Ace] = True
 isStraight ranks_ = isConsecutive ranks_ && length ranks_ == 5
 
 
@@ -117,5 +121,5 @@ isStraightFlush cards =
 -- | Given a @[Card]@, returns @True@ if the list contains exactly 5 cards which form a @RoyalFlush@.
 isRoyalFlush :: [Card] -> Bool
 isRoyalFlush cards =
-  sort (cardRank <$> cards) == [Ace, Ten, Jack, Queen, King] &&
+  sort (cardRank <$> cards) == [Ten, Jack, Queen, King, Ace] &&
   isFlush (cardSuit <$> cards)

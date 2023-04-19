@@ -1,41 +1,68 @@
-@startuml
+@startuml P2P-PokerGame-StateDiagram
 top to bottom direction
 
 
-[*] --> NotStarted : Start
+
+[*] --> CommitState : Smart contract created
+CommitState --> CommitState : JoinAction (secretHash, sgKeyEncryptedDeck) 
+CommitState --> RevealState : No of players reached
+note left of CommitState 
+    add player
+    update deck
+    update balance
+endnote
+RevealState --> RevealState : RevealAction (secret, multiKeyEncryptedDeck)
+note left of RevealState
+    verify secrethash
+    store secret
+    update deck
+endnote
+RevealState --> RevealCards : all secrets revealed
+RevealCards --> RevealCards : UnlockCards
+note left of RevealCards
+    verify vkeys 
+    (encrypt other plyrs encrypted and see if match)
+endnote
+RevealCards --> FirstBetRound : all vkeys posted
 
 
-NotStarted --> NotStarted : Init game\n params
-NotStarted --> NotStarted : Add player
-NotStarted --> NotStarted : Remove player
-
-NotStarted --> DealerSelection : [no. of players between 2 and 5]
-
-
-
-DealerSelection --> DealerSelection : Player "vote"
-DealerSelection --> PostingBlinds : All players voted
-
-PostingBlinds  --> PostingBlinds : Place bet
-PostingBlinds  --> DealingHands : Blind bets placed
-
-DealingHands --> DealingHands : Deal Player Hand
-DealingHands --> FirstBetRound : All player have hands
-
-FirstBetRound --> FirstBetRound : Player Action (Bet/Call/Fold/Raise)
+FirstBetRound --> FirstBetRound : BettingAction  : SmallBlindBet | Call | Raise Int | Fold | AllIn
+note left of FirstBetRound
+    update bets
+    update players
+endnote
 FirstBetRound --> Drawing : Betting round ended
 
-Drawing --> Drawing : Player Change cards
-Drawing --> SecondBetRound : All players acted
+Drawing --> Drawing : DrawingAction : NoDraw | Draw [Int] 
+note left of Drawing
+    update players
+    update deck
+endnote
+
+Drawing --> RevealCards2 : all secrets revealed
+RevealCards2 --> RevealCards2 : UnlockCards
+note left of RevealCards2
+    verify vkeys 
+    (encrypt other plyrs encrypted and see if match)
+endnote
+RevealCards2 --> SecondBetRound : all vkeys posted
 
 
 SecondBetRound --> SecondBetRound : Player Action (Bet/Call/Fold/Raise)
+note left of SecondBetRound
+    update bets
+    update players
+endnote
 SecondBetRound --> Showdown : Betting round ended
 
-Showdown --> Showdown : Player reveal cards
+Showdown --> Showdown : ShowdownAction :([privatekeys]) 
 Showdown --> EndOfHand : All players revealed
+note left of EndOfHand
+    calculate reward
+    update pot and balances
+    change dealer
+endnote
+EndOfHand --> FirstBetRound : continue
+EndOfHand --> [*]: close
 
-EndOfHand --> EndOfHand : calculate reward
-EndOfHand --> EndOfHand : update pot and balances
-EndOfHand --> EndOfHand : change dealer 
-EndOfHand --> PostingBlinds 
+

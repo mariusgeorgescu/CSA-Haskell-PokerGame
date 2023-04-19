@@ -26,12 +26,14 @@ library
     PokerGame
     PokerGameApp
     PokerLogic
+    Poker
 
   -- other-modules:
   -- other-extensions:
   build-depends:
     , base            ^>=4.17.0.0
     , containers
+    , data-default
     , extra
     , haskeline
     , monad-loops

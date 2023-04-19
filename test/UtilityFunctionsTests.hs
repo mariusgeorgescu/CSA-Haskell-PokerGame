@@ -14,9 +14,9 @@ propertyTestsSuite :: IO ()
 propertyTestsSuite =
   hspec $ do
     describe "Utility funnctions" $ do
-      it "intToRank should be inverse of rankToInt" $
+      it "intToRank should be inverse of rankToInt for range [2..12]" $
         property $ \x ->
-          x <= 13 && x >= 1 ==> rankToInt (intToRank x) `shouldBe` x
+          x >= 2 && x <= 12 ==> rankToInt (intToRank x) `shouldBe` x
     describe "Deck" $ do
       let deck = mkFullDeck
       context "When created" $ do

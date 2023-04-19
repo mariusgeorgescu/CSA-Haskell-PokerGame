@@ -26,8 +26,7 @@ data Suit
 
 -- | Card ranks.
 data Rank
-  = Ace
-  | Two
+  = Two
   | Three
   | Four
   | Five
@@ -39,6 +38,7 @@ data Rank
   | Jack
   | Queen
   | King
+  | Ace
   deriving (Eq, Ord, Enum, Bounded)
 
 
@@ -150,21 +150,21 @@ shuffleDeckR (Deck cards) = do
  Returns the first n cards and the updated deck-}
 drawCards :: Int -> Deck -> Either String ([Card], Deck)
 drawCards n (Deck cards)
-  | n > 0     = Right (take n cards, Deck (drop n cards))
+  | n >= 0    = Right (take n cards, Deck (drop n cards))
   | otherwise = Left "No. of cards to draw must be positive"
 
 -------------------------------------------------------------------------------
 -- * Utility functions
 -------------------------------------------------------------------------------
 
--- | Converts Rank to Int (Ace == 1)
+-- | Converts Rank to Int
 rankToInt :: Rank -> Int
-rankToInt r = fromEnum r + 1
+rankToInt r = fromEnum r + 2
 
 
--- | Converts Int to Rank (1 == Ace)
+-- | Converts Int to Rank
 intToRank :: Int -> Rank
-intToRank i = toEnum $ (i - 1) `mod` 13
+intToRank i = toEnum $ (i `mod` 13) - 2
 
 
 -- | Converts char to suit

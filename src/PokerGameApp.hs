@@ -18,19 +18,23 @@ import           Control.Monad.State       (MonadState, StateT (runStateT),
 import           Control.Monad.Error.Class (MonadError (throwError))
 import           Control.Monad.Loops       (iterateUntil)
 
-import           Control.Monad             (replicateM)
-import           Data.Char                 (toUpper)
+import           Data.Char                 (digitToInt, toUpper)
 import           Data.Either.Extra         (maybeToEither)
-import           PokerGame                 (GameState (..), PokerGame,
+
+import           Cards                     (shuffleDeckR)
+import           PokerGame                 (GameState (..),
+                                            PokerGame (gameDeck),
                                             PokerPlayerAction (..), actionVal,
-                                            addPlayerToGame, discardAndDraw,
-                                            gameMaxBet, gameState,
-                                            getCurrentPlayer,
+                                            addPlayerToGame, determineWinner,
+                                            discardAndDraw, gameMaxBet,
+                                            gameState, getCurrentPlayer,
                                             getCurrentPlayerBets,
                                             getCurrentPlayerHand,
-                                            getCurrentPlayerId, initPokerGame,
-                                            isFoldPlayer, roundBettingAction,
+                                            getCurrentPlayerId, isFoldPlayer,
+                                            mkFiveCardDrawPokerGame,
+                                            mkGameSettings, roundBettingAction,
                                             showPlayerInGame)
+import           PokerLogic                (Combination (..))
 import           System.Console.Haskeline  (defaultSettings, getInputChar,
                                             runInputT)
 import           System.Random             (Random (randomR), RandomGen,
@@ -104,10 +108,19 @@ randomList gen n = go gen [0 .. n - 1]
 testPokerApp :: PokerApp ()
 testPokerApp = do
   initGame
+  shuffleGameDeck -- Optional
   addPlayers
   firstBettingRound
   drawingRound
+  secondBettingRound
+  printWinner
   return ()
+
+shuffleGameDeck :: PokerApp ()
+shuffleGameDeck = do
+  g <- get
+  sd <- liftIO $ shuffleDeckR $ gameDeck g
+  put g {gameDeck = sd}
 
 initGame :: PokerApp ()
 initGame = do
@@ -116,7 +129,8 @@ initGame = do
   let gen = mkStdGen 10
   let permutations = randomList gen 51
   liftIO $ gameMessage "Initializing the game"
-  g <- liftEither $ initPokerGame permutations minBet playersToStart
+  gs <- liftEither $ mkGameSettings minBet playersToStart
+  let g = mkFiveCardDrawPokerGame gs
   liftIO $ print g
   put g
 
@@ -153,6 +167,14 @@ firstBettingRound = do
   game <- get
   liftIO $ print game
 
+secondBettingRound :: PokerApp ()
+secondBettingRound = do
+  liftIO $ gameMessage "2nd betting round"
+  s <- iterateUntil (`elem` [Showdown, EndOfHand]) bettingActionAndReturnState
+  liftIO $ print s
+  game <- get
+  liftIO $ print game
+
 bettingActionAndReturnState :: PokerApp GameState
 bettingActionAndReturnState = gameState <$> bettingAction
 
@@ -168,10 +190,10 @@ bettingAction = do
     if isFoldPlayer currentPlayer
       then return Nothing
       else Just <$> getActionFromUser
-  game <- get
+  game2 <- get
   g <-
     catchError
-      (liftEither (roundBettingAction user_action game))
+      (liftEither (roundBettingAction user_action game2))
       (handleLocalError bettingAction)
   put g
   liftIO $ print g
@@ -179,7 +201,6 @@ bettingAction = do
   where
     getActionFromUser :: PokerApp PokerPlayerAction
     getActionFromUser = do
-      g <- get
       liftIO $ putStrLn "Choose your action : "
       liftIO printAvailableActions
       c <- liftEither . maybeToEither "error" =<< liftIO getCharFromTerminal
@@ -211,6 +232,19 @@ printCurrentPlayer = do
   game <- get
   p_id <- liftEither $ getCurrentPlayerId game
   liftIO $ putStrLn $ showPlayerInGame game p_id
+
+printWinner :: PokerApp ()
+printWinner = do
+  g <- get
+  let results = determineWinner g
+  let (wid, wcomb) = head results
+  liftIO $
+    print $
+    "The winner is player : " ++
+    show wid ++ " with " ++ show (combHandRank <$> wcomb)
+  liftIO $ putStrLn $ showPlayerInGame g wid
+  _ <- liftIO $ mapM print results
+  return ()
 
 
 --
@@ -254,7 +288,7 @@ drawingAction = do
   liftIO $ print $ getCurrentPlayerHand game
   player <- liftEither $ getCurrentPlayer game
   if isFoldPlayer player
-    then do 
+    then do
       g <- liftEither $ discardAndDraw [] game
       put g
       return g
@@ -267,11 +301,18 @@ drawingAction = do
       put g
       return g
 
-
 getCardsToDiscard :: PokerApp [Int]
-getCardsToDiscard = return [0,1] -- TO Do
-
-
+getCardsToDiscard = do
+  liftIO $ print "Do you want to discard cards ?"
+  liftIO $ putStrLn "| \ESC[92mY - Yes\ESC[0m | \ESC[95mN - NO\ESC[0m |"
+  c <- liftIO getCharFromTerminal
+  case toUpper <$> c of
+    Just 'Y' -> do
+      liftIO $ print "enter indexes of cards to discard: "
+      line <- liftIO getLine
+      let ints = digitToInt <$> line
+      catchError (pure ints) (handleLocalError getCardsToDiscard)
+    _ -> return []
 
 drawingActionAndReturnState :: PokerApp GameState
 drawingActionAndReturnState = gameState <$> drawingAction

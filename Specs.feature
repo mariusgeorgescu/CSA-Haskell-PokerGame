@@ -1,99 +1,79 @@
-#   = NotStarted -- ^ The initial state of the game, where players are not yet playing.
-#   | ChooseDealer -- ^ Choose who is the dealer and determine the blinds based on that.
-#   | PostingBlinds -- ^ Before each hand, the two players to the left of the dealer are required to post blind bets, which are small forced bets that begin the pot.
-#   | DealingHands -- ^ After the blinds have been posted, the dealer deals five cards to each player, face down
-#   | FirstBetRound -- ^ Once the cards have been dealt, the first round of betting begins. Players can either fold, call (match the previous bet), or raise (increase the previous bet).
-#   | Drawing -- ^ After the first round of betting, players have the option to discard some or all of their cards and receive new ones from the dealer.
-#   | SecondBetRound -- ^ After the drawing round, another round of betting begins, with the same options as before: fold, call, or raise
-#   | Showdown -- ^ If more than one player is still in the hand after the second round of betting, a showdown occurs, where the players reveal their cards and the best hand wins the pot.
-#   | EndOfHand -- ^ After the pot has been awarded, the next hand begins, with the player to the left of the previous dealer becoming the new dealer.
-
-# -- | Game
-# data PokerGame =
-#   FiveCardDraw
-#     { gameState           :: GameState
-#     , gameDeck            :: Deck
-#     , gameMuck            :: [Card]
-#     , gameBets            :: [(Int, PokerPlayerAction)]
-#     , gameDealerIndex     :: Maybe Int
-#     , gamePlayerTurnIndex :: Maybe Int
-#     , gameMinBet          :: Int
-#     , gamePlayers         :: [PokerPlayer]
-#     }
 
 
-# -- | Player
-# data PokerPlayer =
-#   PokerPlayer
-#     { 
-#     , playerHand           :: Maybe Hand
-#     , playerId             :: Int
-#     , playerName           :: String
-#     , playerChips          :: Int
-#     }
+PlayerLobbyAction
+  - Join name pk sig seedhash
+  - Reveal pk sig seed 
+
+PlayerBettingAction  : SmallBlindBet Check/Call Raise Fold AllIn
+
+PlayerDrawingAction : NoDraw Draw 
 
 
 
+--- execAction pa -> m ()
+
+Jocul se joaca in 2 jucatori;
+# deck, sgp1deck
+Primul jucator initiaza contractul si stabilieste 
+  -min bet
+  -table chips
+  - pachet in clar si encryptat SgP1
+
+#SGP1SGP2 (sgp1sgp2 deck)
+Cel de al doilea jucator encrypteza pachetul cu cheie unica si amesteca (SgP1-SgP2)
+
+#Mkey (deck)
+P1 decripteaza encrypteaza multikey (SgP2-MkP1)
+
+P2 decripteaza si encrypteaza mkey (MkP1 - MkP2)
 
 
-@isValidNotStarted 
-      @gameState == @NotStarted
-      @gameDeck isValidDeck
-      @gameMuck isEmpty
-      @gameBets isEmpty
-      @gameDealerIndex == Nothing
-      @gamePlayerTurnIndex == Nothing
-      @gamePlayers length less then or equal to 5
+P1 da chei (mp1v[i])
 
+P2  verifica :
+   decrypt mp1v[i] (decrypt sig2 (SgP2-MkP1)) == decrypt mp1v[i] (decrypt mp2v[i] (MkP1 - MkP2)  -- show
 
-@NotStarted
-Feature: Poker Game Lifecycle
-  Background: PokerGame initiated in @NotStarted state
-    Given @isValidNotStarted  
+  encrypt mp2v[i] (decrypt sig2 SgP2-MkP1)) ==  (MkP1 - MkP2) [i] 
+        --proof valid mkey and sig2
 
-      
-  Scenario: Add new player to game 
-    Given Valid PokerGame in @NotStarted state
-      When New player joins the game
-        Given @isValidPlayer
-        Then 
-          If length of @gamePlayers less than minPlayersToStart
-            Return new game such that
-              @gamePlayers == @Player : @gamePlayers  -- Deep equality
-              @isValidNotStarted
-              rest of are values equal 
-          else length of @gamePlayers + 1 greater than minPlayersToStart
-            add player to game
-            set dealer
-            deal hands 
-            place min bets
-            Return new game such that 
-              @gameState == @FirstBetRound
-              @gameDeck == corect player has correct cards
-              @gameMuck is empty
-              @gameBets == corect players have minbets are placed
-              @gameDealerIndex == setDealerIndex        
-              @gamePlayerTurnIndex == (setDealerIndex + 1) mod length @gamePlayers       
-              @gamePlayers == correct players have bets placed
+P2 da chei
+P1 verifica 
+  encrypt mp2v[1] mp1v[i] i = (MkP1 - MkP2)
 
-  Scenario: Start poker game
-    Given Valid PokerGame in @NotStarted state
-      When Game started 
-        Given 
-
-  Scenario: Place bet
-    Given Valid PokerGame in @FirstBetRound state
-     When Payer places bet
-      Given 
-        @gamePlayerTurnIndex is player's id 
-        players bet >= @valueToCall
-        players chips - bet >= 0
+  encrypt mv1 (decrypt sig1 SgP1-SgP2)) ==  SgP2-MkP1) [i] 
+        --proof valid mv1 and sig1
 
 
 
-isBettingRoundOver 
-  - noNewRaises -- check last action of each player
-  - allPlayersActed -- length of action of all players must be equal
-  
-if isOver and all folded ->endGame game  
-elseDrawing  
+O actiune care schimba starea jocului:
+  - trebuie semnata de jucatorul al carui rand este sa actioneze    -- isValidAction pk sig action -> m bool
+  - trebuie sa fie potrivita pentru momentul jocului --- isValidAction pa  -> m bool
+  - daca are parametrii, acestia trebuie sa fie valizi in functie de starea jocului  --- isValidAction pa  -> m bool
+
+
+
+Tipuri de actiuni
+
+  - JoinAction (secrethash, sgKeyEncryptedDeck) -- hash secret pentru randomness 
+  - RevealAction (secret, multiKeyEncryptedDeck)  -- secret
+  - UnlockCardsAction [secrets]
+  - BettingAction  : SmallBlindBet | Call | Raise Int | Fold | AllIn
+  - DrawingAction : NoDraw | Draw [Int] 
+  - ShowdownAction : ([hashcards]) 
+
+
+Inante de inceperea jocului:
+  Jucatori intra in lobby cu:
+    - identitate
+    - hash de secret pentru sursa de randomness
+
+Cand numarul de jucatori e suficient jocul poate sa inceapa
+  -jucatorii trebuie sa poata sa dovedeasca secretul
+
+Dupa ce toti jucatorii au aratat secretul
+  - dealerul se seteaza si ordinea jucatorilor
+  - acesta incepe amestecarea pachetului (encrypt all and shuffle ) round + encrypt indiv round
+
+  - post blinds 
+
+
