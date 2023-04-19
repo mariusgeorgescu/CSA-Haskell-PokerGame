@@ -1,14 +1,17 @@
 module UtilityFunctionsTests where
 
-import           Cards           (Deck (deckCards), intToRank, mkFullDeck,
-                                  rankToInt, shuffleDeckR)
-import           Data.List       (nub)
-
-import           PokerGame
-
-import           Data.Either     (isLeft)
-import           Test.Hspec
-import           Test.QuickCheck
+import Cards
+  ( Deck (deckCards),
+    intToRank,
+    mkFullDeck,
+    rankToInt,
+    shuffleDeckR,
+  )
+import Data.Either (isLeft)
+import Data.List (nub)
+import Test.Hspec
+import Test.QuickCheck
+import PokerLogic
 
 propertyTestsSuite :: IO ()
 propertyTestsSuite =
@@ -34,11 +37,14 @@ propertyTestsSuite =
       context "When created" $ do
         it "should show an error if no. of cards is different than 5" $
           property $ \n ->
-            n /=
-            5 ==> do
-              cards <- generate $ vectorOf n arbitrary
-              isLeft (mkHand cards) `shouldBe` True
+            n
+              /= 5
+              ==> do
+                cards <- generate $ vectorOf n arbitrary
+                isLeft (mkHand cards) `shouldBe` True
         it "should contain 5 cards" $
-          property $ \h -> length (handCards h) `shouldBe` (5 :: Int)
+          property $
+            \h -> length (handCards h) `shouldBe` (5 :: Int)
         it "should not contain duplicates" $
-          property $ \h -> nub (handCards h) `shouldBe` handCards h
+          property $
+            \h -> nub (handCards h) `shouldBe` handCards h

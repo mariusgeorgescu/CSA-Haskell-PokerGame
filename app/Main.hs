@@ -1,8 +1,16 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
 
-import           PokerGame
+import Crypto.Hash
 
-import           PokerGameApp (Env (Env), runPokerApp, testPokerApp)
+import Data.ByteString (ByteString)
+
+exampleHashWith :: ByteString -> IO ()
+exampleHashWith msg = do
+    putStrLn $ "  sha1(" ++ show msg ++ ") = " ++ show (hashWith SHA1   msg)
+    putStrLn $ "sha256(" ++ show msg ++ ") = " ++ show (hashWith SHA256 msg)
+
 
 
 -- testRun2 :: [Int] -> Either String PokerGame
@@ -19,10 +27,7 @@ import           PokerGameApp (Env (Env), runPokerApp, testPokerApp)
 --     go g (x:xs) =
 --       let (r, g') = randomR (0, n - x - 1) g
 --        in r : go g' xs
+
 main :: IO ()
 main = do
-  putStrLn "Hello, Haskell Poker Game!"
-  -- gen <- newStdGen
-  -- let perms = randomList gen 51
-  let g = initPokerGame 10 4
-  either print (flip (runPokerApp (Env 1 4)) testPokerApp) g
+  exampleHashWith "marius"

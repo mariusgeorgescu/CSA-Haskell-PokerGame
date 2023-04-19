@@ -2,12 +2,9 @@
 
 module PokerLogicTests where
 
-import           Cards      (Card)
-import           PokerGame  (Hand (handCards), mkHand)
-import           PokerLogic (Combination (combHandRank),
-                             HandRank (Flush, FourOfaKind, FullHouse, Highcard, OnePair, RoyalFlush, Straight, StraightFlush, ThreeOfaKind, TwoPairs),
-                             evaluateHand)
-import           Test.Hspec (describe, hspec, it, shouldBe)
+import Cards (Card)
+import PokerLogic
+import Test.Hspec (describe, hspec, it, shouldBe)
 
 pokerHandEvaluateTestSuite :: IO ()
 pokerHandEvaluateTestSuite =
@@ -36,10 +33,11 @@ pokerHandEvaluateTestSuite =
   where
     isHandRank cards handRank = do
       it
-        ("Input: " ++ show cards ++ "\t --> Expected output: " ++ show handRank) $ do
-        let h = mkHand cards
-        (combHandRank . evaluateHand . handCards <$> h) `shouldBe`
-          Right handRank
+        ("Input: " ++ show cards ++ "\t --> Expected output: " ++ show handRank)
+        $ do
+          let h = mkHand cards
+          (combHandRank . evaluateHand . handCards <$> h)
+            `shouldBe` Right handRank
 
 pokerHandCompareTestSuite :: IO ()
 pokerHandCompareTestSuite =
@@ -56,44 +54,48 @@ pokerHandCompareTestSuite =
           ["2d", "3d", "4d", "5d", "6d"]
           GT
       describe
-        "Test that two straight flushes with different high cards are compared correctly:" $ do
-        compareHands
-          ["2d", "3d", "4d", "5d", "6d"]
-          ["3c", "4c", "5c", "6c", "7c"]
-          LT
+        "Test that two straight flushes with different high cards are compared correctly:"
+        $ do
+          compareHands
+            ["2d", "3d", "4d", "5d", "6d"]
+            ["3c", "4c", "5c", "6c", "7c"]
+            LT
       describe "Test that a four of a kind beats a full house:" $ do
         compareHands
           ["As", "Ac", "Ad", "Ah", "2h"]
           ["Ks", "Kc", "Kd", "Qh", "Qs"]
           GT
       describe
-        "Test that two full houses with different three-of-a-kind values are compared correctly:" $ do
-        compareHands
-          ["Ks", "Kc", "Kd", "8h", "8s"]
-          ["Qs", "Qc", "Qd", "Js", "Jc"]
-          GT
+        "Test that two full houses with different three-of-a-kind values are compared correctly:"
+        $ do
+          compareHands
+            ["Ks", "Kc", "Kd", "8h", "8s"]
+            ["Qs", "Qc", "Qd", "Js", "Jc"]
+            GT
       describe "Test that a flush beats a straight:" $ do
         compareHands
           ["2s", "7s", "9s", "Js", "Qs"]
           ["2s", "3c", "4d", "5h", "6s"]
           GT
       describe
-        "Test that two flushes with different high cards are compared correctly:" $ do
-        compareHands
-          ["2s", "7s", "9s", "Js", "Qs"]
-          ["3s", "8s", "10s", "Js", "Ks"]
-          LT
+        "Test that two flushes with different high cards are compared correctly:"
+        $ do
+          compareHands
+            ["2s", "7s", "9s", "Js", "Qs"]
+            ["3s", "8s", "10s", "Js", "Ks"]
+            LT
       describe "Test that a three of a kind beats two pair:" $ do
         compareHands
           ["7h", "7c", "7d", "3s", "10c"]
           ["9h", "9c", "10d", "10s", "4d"]
           GT
       describe
-        "Test that two pairs with different high pairs are compared correctly:" $ do
-        compareHands
-          ["9h", "9c", "10d", "10s", "4d"]
-          ["8h", "8c", "Jd", "Js", "2d"]
-          LT
+        "Test that two pairs with different high pairs are compared correctly:"
+        $ do
+          compareHands
+            ["9h", "9c", "10d", "10s", "4d"]
+            ["8h", "8c", "Jd", "Js", "2d"]
+            LT
       describe "Test that a pair beats a high card:" $ do
         compareHands
           ["6h", "6c", "3d", "5s", "10h"]
@@ -152,7 +154,12 @@ pokerHandCompareTestSuite =
   where
     compareHands cards1 cards2 cmp = do
       it
-        ("Input: " ++
-         show cards1 ++
-         " vs. " ++ show cards2 ++ "\t --> Expected output: " ++ show cmp) $ do
-        compare (evaluateHand cards1) (evaluateHand cards2) `shouldBe` cmp
+        ( "Input: "
+            ++ show cards1
+            ++ " vs. "
+            ++ show cards2
+            ++ "\t --> Expected output: "
+            ++ show cmp
+        )
+        $ do
+          compare (evaluateHand cards1) (evaluateHand cards2) `shouldBe` cmp
