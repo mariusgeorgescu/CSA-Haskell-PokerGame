@@ -2,32 +2,37 @@
 
 module Main where
 
-import Crypto.Hash
-
+import Crypto.PubKey.RSA
+import Crypto.PubKey.RSA.Prim
+import Crypto.Random
 import Data.ByteString (ByteString)
-
-exampleHashWith :: ByteString -> IO ()
-exampleHashWith msg = do
-    putStrLn $ "  sha1(" ++ show msg ++ ") = " ++ show (hashWith SHA1   msg)
-    putStrLn $ "sha256(" ++ show msg ++ ") = " ++ show (hashWith SHA256 msg)
+import Data.ByteString.Char8 (pack, unpack)
 
 
+cRsaEncryptBS :: PublicKey -> ByteString -> ByteString
+cRsaEncryptBS pubKey msg = ep pubKey msg
 
--- testRun2 :: [Int] -> Either String PokerGame
--- testRun2 perms =
---   initPokerGame perms 10 >>= addPlayerToGame "Marius" 100 >>=
---   addPlayerToGame "Andrei" 100 >>=
---   startPokerGame >>=
---   setDealer 1 >>=
---   dealHands
--- randomList :: RandomGen g => g -> Int -> [Int]
--- randomList gen n = go gen [0 .. n - 1]
---   where
---     go _ [] = []
---     go g (x:xs) =
---       let (r, g') = randomR (0, n - x - 1) g
---        in r : go g' xs
+cRsaDecryptBS :: PrivateKey -> ByteString -> ByteString
+cRsaDecryptBS privKey msg = dp Nothing privKey msg
 
 main :: IO ()
 main = do
-  exampleHashWith "marius"
+    -- Generate keys for two players
+    (pub1, priv1) <- generate 256 3
+    (pub2, priv2) <- generate 256 3
+ 
+    -- Simulate card encryption and decryption using ByteString
+    let card = pack "42" -- Assuming a small card identifier
+    let encryptedCard1 = cRsaEncryptBS pub1 card
+    print $ "e1 :" ++ show encryptedCard1
+
+    let encryptedCard2 = cRsaEncryptBS pub2 encryptedCard1
+    print $ "e2" ++ show encryptedCard2
+    
+    let decryptedCard1 = cRsaDecryptBS priv2 encryptedCard2
+    print $ "d1" ++ show decryptedCard1
+    
+    let decryptedCard2 = cRsaDecryptBS priv1 decryptedCard1
+    print "result"
+ 
+    putStrLn $ "Decrypted card: " ++ unpack decryptedCard2

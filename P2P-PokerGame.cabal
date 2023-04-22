@@ -59,6 +59,7 @@ executable Game
     , RSA == 2.4.1
     , cryptonite 
     , haskoin-core
+    , bytestring
 
   hs-source-dirs:   app
   default-language: Haskell2010
