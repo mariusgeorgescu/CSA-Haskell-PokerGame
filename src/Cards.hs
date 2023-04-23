@@ -1,29 +1,29 @@
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE InstanceSigs      #-}
+{-# LANGUAGE LambdaCase        #-}
 
 module Cards where
 
-import Control.Monad.IO.Class (MonadIO)
-import Data.Function (on)
-import Data.String (IsString (fromString))
-import System.Random (newStdGen)
-import System.Random.Shuffle as SRS (shuffle, shuffle')
-import Test.QuickCheck (Arbitrary (arbitrary), Gen, elements)
+import           Control.Monad.IO.Class (MonadIO)
+import           Data.Binary
+import           Data.Function          (on)
+import           Data.String            (IsString (fromString))
+import           GHC.Generics           (Generic)
+import           System.Random          (newStdGen)
+import           System.Random.Shuffle  as SRS (shuffle, shuffle')
+import           Test.QuickCheck        (Arbitrary (arbitrary), Gen, elements)
 
 -------------------------------------------------------------------------------
-
 -- * Declarations
-
 -------------------------------------------------------------------------------
-
 -- | Card suits.
 data Suit
   = Spades
   | Hearts
   | Diamonds
   | Clubs
-  deriving (Eq, Enum, Bounded)
+  deriving (Eq, Enum, Bounded, Generic)
 
 -- | Card ranks.
 data Rank
@@ -40,40 +40,48 @@ data Rank
   | Queen
   | King
   | Ace
-  deriving (Eq, Ord, Enum, Bounded)
+  deriving (Eq, Ord, Enum, Bounded, Generic)
 
 -- | Card type.
-data Card = Card
-  { cardRank :: !Rank,
-    cardSuit :: !Suit
-  }
-  deriving (Eq)
+data Card =
+  Card
+    { cardRank :: !Rank
+    , cardSuit :: !Suit
+    }
+  deriving (Eq, Generic)
 
 -- | Deck type.
-newtype Deck = Deck
-  { deckCards :: [Card]
-  }
+newtype Deck =
+  Deck
+    { deckCards :: [Card]
+    }
   deriving (Eq)
 
 -------------------------------------------------------------------------------
 --  Instances
 -------------------------------------------------------------------------------
+instance Binary Suit
+
+instance Binary Rank
+
+instance Binary Card
+
 instance Show Suit where
   show :: Suit -> String
-  show Spades = "S" -- "\x2660"
-  show Hearts = "H" -- "\x1b[31m\x2665\x1b[0m"
+  show Spades   = "S" -- "\x2660"
+  show Hearts   = "H" -- "\x1b[31m\x2665\x1b[0m"
   show Diamonds = "D" -- "\x1b[31m\x2666\x1b[0m"
-  show Clubs = "C" -- "\x2663"
+  show Clubs    = "C" -- "\x2663"
 
 instance Show Rank where
   show :: Rank -> String
   show r =
     case r of
-      Ace -> "A"
-      King -> "K"
+      Ace   -> "A"
+      King  -> "K"
       Queen -> "Q"
-      Jack -> "J"
-      _ -> show . rankToInt $ r
+      Jack  -> "J"
+      _     -> show . rankToInt $ r
 
 instance IsString Rank where
   fromString :: String -> Rank
@@ -83,7 +91,7 @@ instance IsString Rank where
       "K" -> King
       "Q" -> Queen
       "J" -> Jack
-      _ -> intToRank (read str)
+      _   -> intToRank (read str)
 
 instance Ord Card where
   compare :: Card -> Card -> Ordering
@@ -120,11 +128,8 @@ instance Arbitrary Card where
   arbitrary = Card <$> arbitrary <*> arbitrary
 
 -------------------------------------------------------------------------------
-
 -- * Functions on Deck
-
 -------------------------------------------------------------------------------
-
 -- | Function to build a full deck of cards
 mkFullDeck :: Deck
 mkFullDeck = Deck [Card r s | r <- [minBound ..], s <- [minBound ..]]
@@ -133,7 +138,7 @@ mkFullDeck = Deck [Card r s | r <- [minBound ..], s <- [minBound ..]]
 shuffleDeck :: [Int] -> Deck -> Either String Deck
 shuffleDeck permutations (Deck cards)
   | length permutations == 51 = Right $ Deck $ SRS.shuffle cards permutations
-  | otherwise = Left "Invalid permutations"
+  | otherwise                 = Left "Invalid permutations"
 
 -- | This function return a shuffled deck using newStdGen
 shuffleDeckR :: (MonadIO m) => Deck -> m Deck
@@ -144,15 +149,12 @@ shuffleDeckR (Deck cards) = do
 -- Returns the first n cards and the updated deck
 drawCards :: Int -> Deck -> Either String ([Card], Deck)
 drawCards n (Deck cards)
-  | n >= 0 = Right (take n cards, Deck (drop n cards))
+  | n >= 0    = Right (take n cards, Deck (drop n cards))
   | otherwise = Left "No. of cards to draw must be positive"
 
 -------------------------------------------------------------------------------
-
 -- * Utility functions
-
 -------------------------------------------------------------------------------
-
 -- | Converts Rank to Int
 rankToInt :: Rank -> Int
 rankToInt r = fromEnum r + 2
@@ -169,4 +171,4 @@ unsafeCharToSuit =
     'c' -> Clubs
     'd' -> Diamonds
     's' -> Spades
-    _ -> error "wrong char"
+    _   -> error "wrong char"
