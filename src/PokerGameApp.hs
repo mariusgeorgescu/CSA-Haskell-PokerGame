@@ -1,8 +1,10 @@
 {-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs               #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE TypeApplications           #-}
 
 module PokerGameApp where
 
@@ -22,6 +24,8 @@ import           Data.Char                 (digitToInt, toUpper)
 import           Data.Either.Extra         (maybeToEither)
 
 import           Cards                     (shuffleDeck, shuffleDeckR)
+import           Control.Exception
+import           Data.Bifunctor            (Bifunctor (first))
 import           PokerGame                 (GameState (..),
                                             PokerGame (gameDeck),
                                             PokerPlayerAction (..), actionVal,
@@ -147,8 +151,8 @@ addPlayers = do
     addPlayerAndReturnState = gameState <$> addPlayer
     addPlayer :: PokerApp PokerGame
     addPlayer = do
-      name <- liftIO $ print "Enter your name: " >> getLine
-      liftIO $ print "100 chips by default"
+      name <- liftIO $ putStrLn "Enter your name: " >> getLine
+      liftIO $ putStrLn "100 chips by default"
       g <- get
       g1 <-
         catchError
@@ -185,7 +189,7 @@ bettingAction = do
   liftIO $ putStrLn "Player's Turn : "
   printCurrentPlayer
   game <- get
-  liftIO $ print $ "Current max bet is: " ++ show (gameMaxBet game)
+  liftIO $ putStrLn $ "Current max bet is: " ++  maybe "not set" show (gameMaxBet game)
   currentPlayer <- liftEither $ getCurrentPlayer game
   user_action <-
     if isFoldPlayer currentPlayer
@@ -211,14 +215,14 @@ bettingAction = do
     printAvailableActions :: IO ()
     printAvailableActions =
       putStrLn
-        "| \ESC[92mC - Call\ESC[0m | \ESC[95mR - Raise\ESC[0m | \ESC[91mF - Fold\ESC[0m | \ESC[92mA - All In\ESC[0m |"
+        "| \ESC[92mC - Call\\Check \ESC[0m | \ESC[95mR - Raise\ESC[0m | \ESC[91mF - Fold\ESC[0m |" --- | \ESC[92mA - All In\ESC[0m |"
     charToAction :: Char -> PokerApp (Either String PokerPlayerAction)
     charToAction c
       | toUpper c == 'C' = do
         g <- get
         valToCall <- liftEither $ maybeToEither "" $ gameMaxBet g
         let playerBets = sum $ actionVal <$> getCurrentPlayerBets g
-        return $ Right $ Call (valToCall - playerBets)
+        return $ Right $ Call (if valToCall > playerBets  then valToCall - playerBets else 0)
       | toUpper c == 'R' = do
         i <- liftEither =<< liftIO (getIntFromTerminal "Enter amount")
         g2 <- get
@@ -240,7 +244,7 @@ printWinner = do
   let results = determineWinner g
   let (wid, wcomb) = head results
   liftIO $
-    print $
+    putStrLn $
     "The winner is player : " ++
     show wid ++ " with " ++ show (combHandRank <$> wcomb)
   liftIO $ putStrLn $ showPlayerInGame g wid
@@ -274,7 +278,7 @@ getCharFromTerminal =
 
 getIntFromTerminal :: String -> IO (Either String Int)
 getIntFromTerminal msg = do
-  print msg
+  putStrLn msg
   readEither <$> getLine
 
 --------------------------------------
@@ -301,19 +305,29 @@ drawingAction = do
 
 getCardsToDiscard :: PokerApp [Int]
 getCardsToDiscard = do
-  liftIO $ print "Do you want to discard cards ?"
+  liftIO $ putStrLn "Do you want to discard cards ?"
   liftIO $ putStrLn "| \ESC[92mY - Yes\ESC[0m | \ESC[95mN - NO\ESC[0m |"
   c <- liftIO getCharFromTerminal
   case toUpper <$> c of
-    Just 'Y' -> do
-      liftIO $ print "enter indexes of cards to discard: "
-      line <- liftIO getLine
-      let ints = digitToInt <$> line
-      catchError (pure ints) (handleLocalError getCardsToDiscard)
+    Just 'Y' -> getIndicesOfCardsToDiscard
     Just 'N' -> return []
     _ ->
-      throwError "Invalid action" `catchError`
+      throwError "Invalid action... choose Y or N" `catchError`
       handleLocalError getCardsToDiscard
+  where
+    getIndicesOfCardsToDiscard :: PokerApp [Int]
+    getIndicesOfCardsToDiscard = do
+      liftIO $
+        putStrLn
+          "Enter maximum 3 indices of cards to discard  \n \t ...(from 0 to 4:  "
+      line <- liftIO getLine
+      ints <- liftIO $ mapM safeDigitToInt line
+      catchError
+        (liftEither $ first show (sequence ints))
+        (handleLocalError getIndicesOfCardsToDiscard)
+      where
+        safeDigitToInt :: Char -> IO (Either SomeException Int)
+        safeDigitToInt c = try (evaluate (digitToInt c))
 
 drawingActionAndReturnState :: PokerApp GameState
 drawingActionAndReturnState = gameState <$> drawingAction
