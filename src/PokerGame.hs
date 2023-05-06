@@ -248,7 +248,8 @@ playerBettingAction :: PokerPlayerAction -> PokerGame -> Either String PokerGame
 playerBettingAction action game@FiveDraw {..}
   | gameState `notElem` [FirstBetRound, SecondBetRound, PostingBlinds] =
     Left $ "Game: Invalid State for Betting Action" ++ show gameState
-  | otherwise = do
+  | actionVal action < 0 = Left "Action value must be greater than 0"
+  | otherwise             = do
     pti <- getCurrentPlayerId game
     p_chips <- getCurrentPlayerChips game
     if actionVal action > p_chips
@@ -279,38 +280,32 @@ roundBettingAction maybe_action game@FiveDraw {..} = do
         case maybe_action of
           Nothing -> Left "No action provied"
           Just action -> do
-            if actionVal action < 0
-              then Left "Invalid value"
-              else do
-                chips_bets_turn <- playerBettingAction action game
-                case action of
-                  SmallBlind _ -> Left $ "Invalid action: " ++ show action
-                  FoldHand -> do
-                    folded_hand <- getCurrentPlayerHand game
-                    let folded_player = current_player {playerHand = Nothing}
-                    let folded_cards = handCards folded_hand
-                    return $
-                      chips_bets_turn
-                        { gamePlayers =
-                            IM.update
-                              (Just . const folded_player)
-                              pti
-                              gamePlayers
-                        , gameMuck = folded_cards ++ gameMuck
-                        }
-                  Call n ->
-                    if Just (n + current_player_bet) /= gameMaxBet
-                      then Left "Invalid call action"
-                      else return chips_bets_turn
-                  Raise n ->
-                    if Just (n + current_player_bet) <= gameMaxBet
-                      then Left "Invalid raise action"
-                      else return
-                             chips_bets_turn
-                               { gameMaxBet = Just (n + current_player_bet)
-                               , lastRaisePlayerId = Just pti
-                               }
-                  AllIn _ -> return game
+            chips_bets_turn <- playerBettingAction action game
+            case action of
+              SmallBlind _ -> Left $ "Invalid action: " ++ show action
+              FoldHand -> do
+                folded_hand <- getCurrentPlayerHand game
+                let folded_player = current_player {playerHand = Nothing}
+                let folded_cards = handCards folded_hand
+                return $
+                  chips_bets_turn
+                    { gamePlayers =
+                        IM.update (Just . const folded_player) pti gamePlayers
+                    , gameMuck = folded_cards ++ gameMuck
+                    }
+              Call n ->
+                if Just (n + current_player_bet) /= gameMaxBet
+                  then Left "Invalid call action"
+                  else return chips_bets_turn
+              Raise n ->
+                if Just (n + current_player_bet) <= gameMaxBet
+                  then Left "Invalid raise action"
+                  else return
+                         chips_bets_turn
+                           { gameMaxBet = Just (n + current_player_bet)
+                           , lastRaisePlayerId = Just pti
+                           }
+              AllIn _ -> return game
   checkIfOver updated_game
 
 checkIfOver :: PokerGame -> Either String PokerGame
