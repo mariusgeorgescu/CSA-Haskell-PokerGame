@@ -21,18 +21,24 @@ import           Control.Monad.Error.Class (MonadError (throwError))
 import           Control.Monad.Loops       (iterateUntil)
 
 import           Data.Char                 (digitToInt, toUpper)
-import           Data.Either.Extra         (maybeToEither)
+import           Data.Either.Extra         (fromRight', maybeToEither)
 
 import           Cards                     (shuffleDeck, shuffleDeckR)
 import           Control.Exception         (SomeException, evaluate, try)
 import           Data.Bifunctor            (Bifunctor (first))
+import           Data.Either               (fromRight)
+import           Data.Maybe                (fromMaybe)
+import           Data.Validation           (fromEither, toEither)
 import           PokerGame                 (GameState (..),
                                             PokerGame (gameDeck),
                                             PokerPlayerAction (..), actionVal,
-                                            addPlayerToGame, determineWinner,
-                                            discardAndDraw, gameMaxBet,
-                                            gameState, getCurrentPlayer,
+                                            addPlayerToGame,
+                                            checkIfValidToDiscard,
+                                            determineWinner, discardAndDraw,
+                                            gameMaxBet, gameState,
+                                            getCurrentPlayer,
                                             getCurrentPlayerBets,
+                                            getCurrentPlayerChips,
                                             getCurrentPlayerId,
                                             getCurrentRoundPot, isFoldPlayer,
                                             mkFiveCardDrawPokerGame,
@@ -181,9 +187,17 @@ bettingActionAndReturnState = gameState <$> bettingAction
       liftIO $ putStrLn "Player's Turn : "
       printCurrentPlayer
       game <- get
+      let chips = fromRight 0 $ getCurrentPlayerChips game
+      let maxbet = fromMaybe 0 (gameMaxBet game)
+      let currentPlayerBet = sum (actionVal <$> getCurrentPlayerBets game)
+      liftIO $ putStrLn $ "Current max bet is: " ++ show maxbet
+      liftIO $ putStrLn $ "Current player bet is :" ++ show currentPlayerBet
+      liftIO $
+        putStrLn $ "Value to call is : " ++ show (maxbet - currentPlayerBet)
       liftIO $
         putStrLn $
-        "Current max bet is: " ++ maybe "not set" show (gameMaxBet game)
+        "You can raise between " ++
+        show (1 + (maxbet - currentPlayerBet)) ++ " and " ++ show chips
       currentPlayer <- liftEither $ getCurrentPlayer game
       user_action <-
         if isFoldPlayer currentPlayer
@@ -300,7 +314,8 @@ drawingRound = do
                   line <- liftIO getLine
                   ints <- liftIO $ mapM safeDigitToInt line
                   catchError
-                    (liftEither $ first show (sequence ints))
+                    (liftEither . toEither . checkIfValidToDiscard =<<
+                     liftEither (first show (sequence ints)))
                     (handleLocalError getIndicesOfCardsToDiscard)
                   where
                     safeDigitToInt :: Char -> IO (Either SomeException Int)

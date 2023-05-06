@@ -6,7 +6,6 @@
 module PokerGame where
 
 import           Cards              (Card, Deck, drawCards, mkFullDeck)
-import           Control.Monad      (foldM)
 import           Data.Bifunctor     (second)
 import           Data.Coerce        (coerce)
 import           Data.Default       (Default (..))
@@ -23,6 +22,7 @@ import           Data.Validation    (Validation (..), toEither)
 import           GHC.Unicode        (isAlpha)
 import           PokerLogic         (Combination, Hand (..), evaluateHand,
                                      mkHand, updateHand)
+import           Utilities          (hasDuplicates, repeatM)
 
 -------------------------------------------------------------------------------
 -- * Declarations
@@ -353,22 +353,6 @@ nextPlayerTurn game@FiveDraw {..} =
 incrementMod :: Int -> Int -> Int
 incrementMod modulus n = succ n `mod` modulus
 
-isRaise :: PokerPlayerAction -> Bool
-isRaise (Raise _) = True
-isRaise _         = False
-
-isFold :: PokerPlayerAction -> Bool
-isFold FoldHand = True
-isFold _        = False
-
-isAllIn :: PokerPlayerAction -> Bool
-isAllIn (AllIn _) = True
-isAllIn _         = False
-
-isSmallBlind :: PokerPlayerAction -> Bool
-isSmallBlind (SmallBlind _) = True
-isSmallBlind _              = False
-
 isFoldPlayer :: PokerPlayer -> Bool
 isFoldPlayer = isNothing . playerHand
 
@@ -423,11 +407,10 @@ checkIfValidToDiscard xs = correctLength *> noDuplicates *> noOutOfRange
         else Success xs
     noOutOfRange =
       if any (>= 5) xs
-        then Failure $ "Player: Invalid card index" ++ " | "
+        then Failure $
+             "Player: Invalid card index " ++
+             (show . nub . filter (>= 5)) xs ++ " | "
         else Success xs
-
-hasDuplicates :: (Eq a) => [a] -> Bool
-hasDuplicates = (/=) <$> length <*> (length . nub)
 
 determineWinner :: PokerGame -> [(Int, Maybe Combination)]
 determineWinner FiveDraw {..} =
@@ -437,7 +420,7 @@ determineWinner FiveDraw {..} =
      IM.toList gamePlayers)
 
 -------------------------------------------------------------------------------
--- *  utilities
+-- *  PokerPlayerAction Functions
 -------------------------------------------------------------------------------
 actionVal :: PokerPlayerAction -> Int
 actionVal action =
@@ -448,10 +431,23 @@ actionVal action =
     Raise n      -> n
     AllIn n      -> n
 
-----------------------
-repeatM :: (Monad m, Num a, Enum a) => a -> (t -> m t) -> t -> m t
-repeatM n f a0 = foldM (\a _ -> f a) a0 [1 .. n]
+isRaise :: PokerPlayerAction -> Bool
+isRaise (Raise _) = True
+isRaise _         = False
 
+isFold :: PokerPlayerAction -> Bool
+isFold FoldHand = True
+isFold _        = False
+
+isAllIn :: PokerPlayerAction -> Bool
+isAllIn (AllIn _) = True
+isAllIn _         = False
+
+isSmallBlind :: PokerPlayerAction -> Bool
+isSmallBlind (SmallBlind _) = True
+isSmallBlind _              = False
+
+----------------------
 -----------
 ---
 --- GAME UTILITIES
