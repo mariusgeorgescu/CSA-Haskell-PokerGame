@@ -3,12 +3,10 @@
 module Main where
 
 import           CardsCrypt    (demo)
-import           PokerGameApp  (pokerGameApp, runPokerApp)
-
-import           PokerGame
-
-import           PokerGameApp  (Env (Env), randomList)
-import           System.Random
+import           PokerGame     (initPokerGame)
+import           PokerGameApp  (Env (Env), pokerGameApp, runPokerApp)
+import           System.Random (mkStdGen)
+import           Utilities     (randomList)
 
 main :: IO ()
 main = do

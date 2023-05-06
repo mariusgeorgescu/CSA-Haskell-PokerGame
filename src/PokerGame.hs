@@ -9,7 +9,7 @@ import           Cards              (Card, Deck, drawCards, mkFullDeck)
 import           Control.Monad      (foldM)
 import           Data.Bifunctor     (second)
 import           Data.Coerce        (coerce)
-import           Data.Default
+import           Data.Default       (Default (..))
 import           Data.Either.Extra  (maybeToEither)
 import           Data.Foldable      (Foldable (foldr'))
 import qualified Data.IntMap.Strict as IM (IntMap, filter, fromList, insert,
@@ -249,7 +249,7 @@ playerBettingAction action game@FiveDraw {..}
   | gameState `notElem` [FirstBetRound, SecondBetRound, PostingBlinds] =
     Left $ "Game: Invalid State for Betting Action" ++ show gameState
   | actionVal action < 0 = Left "Action value must be greater than 0"
-  | otherwise             = do
+  | otherwise            = do
     pti <- getCurrentPlayerId game
     p_chips <- getCurrentPlayerChips game
     if actionVal action > p_chips
