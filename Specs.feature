@@ -1,4 +1,75 @@
 
+P1 - hash permutare 1-52 + hash permutare 5-52
+P2 - hash permutare 1-52 + hash 5 indexi 5-52
+
+P2 - reveal 1-51  -- P1 stie cartile lui
+P1 - reveal 
+
+
+
+P2 -  permutare + (5 indecsi pt P1) si (hash indecsi P2)  -- P1 stie mana lui
+P1 
+
+P1 - Reveal hash deck   --- P2 stie mana lui
+
+P2 - Reveal
+pachet permutat
+
+
+
+
+
+
+Alice , shuffle and encrypt deck  ---- shuffled deck encrypted by alice
+
+Bob 
+choose hands (5 indeces for him) (5 indeces for alice) 
+bob posts 5 indeces for alice and 5 encrypted bs 
+--- Alice Hand encrypted by alice
+--- Bob Hand encrypted by alice and bob
+
+Alice decripts bob hand and post 5 bs
+-- BobHand -- encrypted by bob
+-- AliceHand encrypted by Alice
+
+
+Alice post key
+  -- decrypt deck and check if valid   -- validam ca alice a pus pachet corect
+  -- decrypt bobhandencbybobandalice and see if match bobhandencrypted by bob -- validam ca alice a fost corecta cand a dat val decriptate
+
+Bob post key
+  -- decrypt bobhandencbybobandalice   --- and check if valid hand (cards in deck encrypted by alice exept alice hand)
+      -- validam ca bob a fost corect cand si-a ales mana
+
+
+--- Validate 
+    -- deck valid
+    -- hands valid (no duplicates)
+
+Contract {
+  GameParams
+  GameState
+}
+validator :: GameParams -> GameState -> Contract -> Bool
+
+
+-- DATUM
+GameState {
+  e1_Deck :: [ByteString]
+  e1_P1Hand :: Maybe [ByteString] 
+  e1_e2_P2Hand :: Maybe [ByteString] 
+  e2_P2Hand :: Maybe [ByteString]  
+  priv_P1 :: Maybe [PrivateKey]
+  priv_P2 :: Maybe [PrivateKey]
+}
+-- REDEMER
+P2_ChooseHands :: ([ByteString], [ByteString])
+  - set e1_P1Hand and  e1_e2_P2Hand
+P1_UnlockP2Hand  [ByteString]
+  - set e2_P2Hand
+P1_Reveal (PrivateKey)
+P2_Reveal (PrivateKey)
+
 
 PlayerLobbyAction
   - Join name pk sig seedhash

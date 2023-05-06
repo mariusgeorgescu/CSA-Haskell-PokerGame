@@ -3,7 +3,18 @@
 {-# LANGUAGE InstanceSigs      #-}
 {-# LANGUAGE LambdaCase        #-}
 
-module Cards where
+module Cards
+  ( mkFullDeck
+  , shuffleDeck
+  , shuffleDeckR
+  , drawCards
+  , Card(cardRank, cardSuit)
+  , Rank(..)
+  , Suit(..)
+  , Deck(deckCards)
+  , rankToInt
+  , intToRank
+  ) where
 
 import           Control.Monad.IO.Class (MonadIO)
 import           Data.Binary
@@ -68,10 +79,10 @@ instance Binary Card
 
 instance Show Suit where
   show :: Suit -> String
-  show Spades   = "S" -- "\x2660"
-  show Hearts   = "H" -- "\x1b[31m\x2665\x1b[0m"
-  show Diamonds = "D" -- "\x1b[31m\x2666\x1b[0m"
-  show Clubs    = "C" -- "\x2663"
+  show Spades   = "\x2660"
+  show Hearts   = "\x1b[31m\x2665\x1b[0m"
+  show Diamonds = "\x1b[31m\x2666\x1b[0m"
+  show Clubs    = "\x2663"
 
 instance Show Rank where
   show :: Rank -> String
