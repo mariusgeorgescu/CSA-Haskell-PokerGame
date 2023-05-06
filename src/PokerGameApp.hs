@@ -4,7 +4,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs               #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE TypeApplications           #-}
 
 module PokerGameApp where
 
@@ -21,14 +20,14 @@ import           Control.Monad.Error.Class (MonadError (throwError))
 import           Control.Monad.Loops       (iterateUntil)
 
 import           Data.Char                 (digitToInt, toUpper)
-import           Data.Either.Extra         (fromRight', maybeToEither)
+import           Data.Either.Extra         (maybeToEither)
 
 import           Cards                     (shuffleDeck, shuffleDeckR)
 import           Control.Exception         (SomeException, evaluate, try)
 import           Data.Bifunctor            (Bifunctor (first))
 import           Data.Either               (fromRight)
 import           Data.Maybe                (fromMaybe)
-import           Data.Validation           (fromEither, toEither)
+import           Data.Validation           (toEither)
 import           PokerGame                 (GameState (..),
                                             PokerGame (gameDeck),
                                             PokerPlayerAction (..), actionVal,

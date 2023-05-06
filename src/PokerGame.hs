@@ -107,8 +107,8 @@ instance Show PokerGame where
   show :: PokerGame -> String
   show = showGame
 
-instance Default PokerGameSettings
- where
+instance Default PokerGameSettings where
+  def :: PokerGameSettings
   def = PokerGameSettings {settingsMinBet = 1, settingsMinPlayersToStart = 2}
 
 -------------------------------------------------------------------------------
@@ -447,11 +447,9 @@ isSmallBlind :: PokerPlayerAction -> Bool
 isSmallBlind (SmallBlind _) = True
 isSmallBlind _              = False
 
-----------------------
------------
----
---- GAME UTILITIES
----
+-------------------------------------------------------------------------------
+-- * Game utils functions
+-------------------------------------------------------------------------------
 getCurrentPlayer :: PokerGame -> Either String PokerPlayer
 getCurrentPlayer g@FiveDraw {..} = do
   pti <- getCurrentPlayerId g
@@ -464,7 +462,7 @@ getCurrentPlayerName game = do
 
 getCurrentPlayerId :: PokerGame -> Either String Int
 getCurrentPlayerId FiveDraw {..} =
-  maybeToEither "Error: Invalid player id 1" gamePlayerTurnIndex
+  maybeToEither "Error: Player turn not set" gamePlayerTurnIndex
 
 getDealerIndex :: PokerGame -> Either String Int
 getDealerIndex FiveDraw {..} =
@@ -479,17 +477,17 @@ getNoOfActivePlayers :: PokerGame -> Int
 getNoOfActivePlayers FiveDraw {..} =
   length $ IM.filter (isNothing . playerHand) gamePlayers
 
-checkSmallBlind :: Int -> Int -> Int -> Bool
-checkSmallBlind d p l =
-  let sb1 = incrementMod l d
-      sb2 = incrementMod l sb1
-   in (p `elem` [sb1, sb2])
-
 isCurrentPlayerSmallBlind :: PokerGame -> Either String Bool
 isCurrentPlayerSmallBlind g@FiveDraw {..} =
   checkSmallBlind <$> maybeToEither "No dealer set" gameDealerIndex <*>
   getCurrentPlayerId g <*>
   pure (length gamePlayers)
+  where
+    checkSmallBlind :: Int -> Int -> Int -> Bool
+    checkSmallBlind d p l =
+      let sb1 = incrementMod l d
+          sb2 = incrementMod l sb1
+       in (p `elem` [sb1, sb2])
 
 getCurrentPlayerBets :: PokerGame -> [PokerPlayerAction]
 getCurrentPlayerBets FiveDraw {..} = do
@@ -500,7 +498,7 @@ getCurrentPlayerBets FiveDraw {..} = do
 getCurrentPlayerChips :: PokerGame -> Either String Int
 getCurrentPlayerChips game@FiveDraw {..} = do
   pti <- getCurrentPlayerId game
-  maybeToEither "Error: Invalid player id 3" $ IM.lookup pti gamePlayersChips
+  maybeToEither "Error: Invalid player id" $ IM.lookup pti gamePlayersChips
 
 getCurrentPlayerHand :: PokerGame -> Either String Hand
 getCurrentPlayerHand game = do
