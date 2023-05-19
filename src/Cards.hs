@@ -17,7 +17,7 @@ module Cards
   ) where
 
 import           Control.Monad.IO.Class (MonadIO)
-import           Data.Binary
+import           Data.Binary            (Binary)
 import           Data.Function          (on)
 import           Data.String            (IsString (fromString))
 import           GHC.Generics           (Generic)

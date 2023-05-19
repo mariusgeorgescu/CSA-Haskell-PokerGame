@@ -136,11 +136,14 @@ mkPokerPlayer' p_id p_name =
 -- * Game functions
 -------------------------------------------------------------------------------
 -- | Function to initate a PokerGame
+-- Returns a Right PokerGame if the minimum bet and no. of players values are valid
+-- and Left error otherwise
 initPokerGame :: Int -> Int -> Either String PokerGame
-initPokerGame i j = do
-  gs <- mkGameSettings i j
+initPokerGame minBet psToStart = do
+  gs <- mkGameSettings minBet psToStart
   return $ mkFiveCardDrawPokerGame gs
 
+-- | Function to create a fresh PokerGame given PokerGameSettings
 mkFiveCardDrawPokerGame :: PokerGameSettings -> PokerGame
 mkFiveCardDrawPokerGame settings =
   FiveDraw
@@ -157,9 +160,11 @@ mkFiveCardDrawPokerGame settings =
     Nothing
     Nothing
 
+-- | Function to create a valid PokerGameSettings given minimum bet and no. of players
 mkGameSettings :: Int -> Int -> Either String PokerGameSettings
 mkGameSettings = (toEither .) . mkGameSettings'
 
+-- | Function to create a valid PokerGameSettings
 mkGameSettings' :: Int -> Int -> Validation String PokerGameSettings
 mkGameSettings' minBet psToStart
   | minBet < 1 = Failure "GameSettings: invalid minimum bet"
@@ -167,30 +172,26 @@ mkGameSettings' minBet psToStart
     Failure "GameSettings: invalid no of players"
   | otherwise = Success $ PokerGameSettings minBet psToStart
 
--- | Function to add a player to a game.
+-- | Function to create a player and add it to a game .
+-- This function checks if the game is in valid state for adding new player,
+-- and if all the parameters are valid returns an Right PokerGame or Left error otherwise
 addPlayerToGame :: String -> Int -> Int -> PokerGame -> Either String PokerGame
 addPlayerToGame p_name p_chips p_nonce game@FiveDraw {..}
   | gameState /= NotStarted               = Left "Game: Invalid state for adding new player"
   | p_chips < settingsMinBet gameSettings = Left "Game: Invalid chips value"
-  | otherwise =
+  | IM.size gamePlayers >= 5              = Left "Game: To many players"
+  | otherwise                             = do
     let p_id = IM.size gamePlayers
-     in if (p_id + 1) > 5
-          then Left "Game: To many players"
-          else do
-            player <- mkPokerPlayer (PlayerID p_id) p_name
-            let gameWithPlayer = addPlayer player p_chips p_nonce game
-            if p_id + 1 < settingsMinPlayersToStart gameSettings
-              then return gameWithPlayer
-              else setDealer gameWithPlayer >>= postBlinds >>= dealHands
-
-addPlayer :: PokerPlayer -> Int -> Int -> PokerGame -> PokerGame
-addPlayer player p_chips p_nonce game@FiveDraw {..} =
-  let p_id = IM.size gamePlayers
-   in game
-        { gamePlayers = IM.insert p_id player gamePlayers
-        , gamePlayersChips = IM.insert p_id p_chips gamePlayersChips
-        , gamePlayersNonce = IM.insert p_id p_nonce gamePlayersNonce
-        }
+    player <- mkPokerPlayer (PlayerID p_id) p_name
+    let gameWithPlayer =
+          game
+            { gamePlayers = IM.insert p_id player gamePlayers
+            , gamePlayersChips = IM.insert p_id p_chips gamePlayersChips
+            , gamePlayersNonce = IM.insert p_id p_nonce gamePlayersNonce
+            }
+    if p_id + 1 < settingsMinPlayersToStart gameSettings
+      then return gameWithPlayer
+      else setDealer gameWithPlayer >>= postBlinds >>= dealHands
 
 -- | Function to set the dealer of a poker game.
 setDealer :: PokerGame -> Either String PokerGame
@@ -509,9 +510,9 @@ getCurrentRoundPot :: PokerGame -> Int
 getCurrentRoundPot FiveDraw {..} =
   foldr' ((+) . (sum . fmap actionVal)) 0 gamePlayersBets
 
----
---- Show
-----
+-------------------------------------------------------------------------------
+-- * Pretty show
+-------------------------------------------------------------------------------
 showPlayer :: PokerPlayer -> String
 showPlayer PokerPlayer {..} =
   "\tPLAYER #" ++

@@ -2,7 +2,7 @@
 
 module PokerLogicTests where
 
-import           Cards
+import           Cards      (Card)
 import           PokerLogic (Combination (combHandRank), Hand (handCards),
                              HandRank (..), evaluateHand, mkHand)
 import           Test.Hspec (describe, hspec, it, shouldBe)
@@ -35,8 +35,7 @@ pokerHandEvaluateTestSuite =
     isHandRank cards handRank = do
       it
         ("Input: " ++ show cards ++ "\t --> Expected output: " ++ show handRank) $ do
-        let h = mkHand cards
-        (combHandRank . evaluateHand . handCards <$> h) `shouldBe`
+        (combHandRank . evaluateHand . handCards <$> mkHand cards) `shouldBe`
           Right handRank
 
 pokerHandCompareTestSuite :: IO ()
@@ -153,4 +152,4 @@ pokerHandCompareTestSuite =
         ("Input: " ++
          show cards1 ++
          " vs. " ++ show cards2 ++ "\t --> Expected output: " ++ show cmp) $ do
-        compare (evaluateHand cards1) (evaluateHand cards2) `shouldBe` cmp
+        (evaluateHand cards1 `compare` evaluateHand cards2) `shouldBe` cmp

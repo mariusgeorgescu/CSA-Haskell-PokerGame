@@ -23,7 +23,6 @@ library
   exposed-modules:
     Cards
     CardsCrypt
-    Poker
     PokerGame
     PokerGameApp
     PokerLogic
