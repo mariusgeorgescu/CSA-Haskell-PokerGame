@@ -48,6 +48,9 @@ import           System.Console.Haskeline  (defaultSettings, getInputChar,
                                             runInputT)
 import           Text.Read                 (readEither)
 
+-------------------------------------------------------------------------------
+-- * Type Declarations
+-------------------------------------------------------------------------------
 data Env =
   Env
     { envMinBet       :: Int
@@ -73,6 +76,9 @@ runPokerApp env pg papp@(PokerApp app) =
              print e
              runPokerApp env pg papp -- re-run the app when error occurs
 
+-------------------------------------------------------------------------------
+-- * Instances
+-------------------------------------------------------------------------------
 instance MonadIO PokerApp where
   liftIO :: IO a -> PokerApp a
   liftIO = PokerApp . liftIO
@@ -103,7 +109,11 @@ instance MonadError String PokerApp where
         Left err         -> pokerApp (handler err)
         Right (x, game') -> put game' >> return x
 
--- | Function
+-------------------------------------------------------------------------------
+-- * Game Flow
+-------------------------------------------------------------------------------
+
+-- | Poker Game Flow
 pokerGameApp :: PokerApp ()
 pokerGameApp = do
   initGame
@@ -320,9 +330,15 @@ drawingRound = do
                     safeDigitToInt :: Char -> IO (Either SomeException Int)
                     safeDigitToInt c = try (evaluate (digitToInt c))
 
---
--- Others
---
+-------------------------------------------------------------------------------
+-- * Utilities
+-------------------------------------------------------------------------------
+handleLocalError :: PokerApp a -> String -> PokerApp a
+handleLocalError g e = do
+  liftIO $ gameErrorMessage e
+  liftIO $ putStrLn "Try again ... "
+  g
+
 printCurrentPlayer :: PokerApp ()
 printCurrentPlayer = do
   game <- get
@@ -338,12 +354,6 @@ gameMessage message =
       replicate pas '*' ++
       "|  " ++ message ++ "  |" ++ replicate pas '*' ++ "\ESC[0m"
 
-handleLocalError :: PokerApp a -> String -> PokerApp a
-handleLocalError g e = do
-  liftIO $ gameErrorMessage e
-  liftIO $ putStrLn "Try again ... "
-  g
-
 gameErrorMessage :: String -> IO ()
 gameErrorMessage message = putStrLn $ "\ESC[31m" ++ message ++ "\ESC[0m"
 
@@ -355,4 +365,3 @@ getIntFromTerminal :: String -> IO (Either String Int)
 getIntFromTerminal msg = do
   putStrLn msg
   readEither <$> getLine
---------------------------------------
