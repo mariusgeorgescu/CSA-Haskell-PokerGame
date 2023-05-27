@@ -74,6 +74,7 @@ executable demo
     , binary
     , bytestring
     , P2P-PokerGame
+    , criterion
 
 
   hs-source-dirs:   app
