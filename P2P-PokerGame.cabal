@@ -22,7 +22,6 @@ library
   import:           warnings
   exposed-modules:
     Cards
-    CardsCrypt
     PokerGame
     PokerGameApp
     PokerLogic
@@ -57,9 +56,26 @@ executable P2P-PokerGame
   -- other-extensions:
   build-depends:
     , base           ^>=4.17.0.0
-    , cryptonite
     , P2P-PokerGame
     , random
+
+  hs-source-dirs:   app
+  default-language: Haskell2010
+
+executable demo
+  import:           warnings
+  main-is:          DemoCardsCrypt.hs
+
+  -- other-modules:
+  -- other-extensions:
+  build-depends:
+    , base           ^>=4.17.0.0
+    , cryptonite
+    , binary
+    , bytestring
+    , P2P-PokerGame
+    , random
+
 
   hs-source-dirs:   app
   default-language: Haskell2010
