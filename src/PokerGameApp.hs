@@ -8,12 +8,12 @@
 module PokerGameApp where
 
 import           Control.Monad.Except      (ExceptT, MonadError (catchError),
-                                            MonadTrans (lift), liftEither,
+                                             liftEither,
                                             runExceptT)
-import           Control.Monad.Reader      (MonadIO (..),
+import           Control.Monad.Reader      (MonadIO (..), lift,
                                             MonadReader (ask, local),
                                             ReaderT (..), asks)
-import           Control.Monad.State       (MonadState, StateT (runStateT),
+import           Control.Monad.State       (MonadState , StateT (runStateT),
                                             evalStateT, get, put)
 
 import           Control.Monad.Error.Class (MonadError (throwError))
