@@ -23,8 +23,15 @@ cabal.project.local
 cabal.project.local~
 .HTF/
 .ghc.environment.*
-.vscode
+
 # Ignore vim files:
 *~
 *.swp
 *.swo
+
+# direnv
+.direnv/
+.env
+
+.vscode
+*.DS_STORE%
