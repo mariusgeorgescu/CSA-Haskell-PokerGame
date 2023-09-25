@@ -353,6 +353,7 @@ getCharFromTerminal =
 
 getIntFromTerminal :: String -> IO (Either String Int)
 getIntFromTerminal msg = do
-  putStrLn msg
+  
+  putStrLn $ "\n"++ msg
   readEither <$> getLine
 --------------------------------------
