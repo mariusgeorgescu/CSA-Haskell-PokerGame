@@ -34,4 +34,10 @@ cabal.project.local~
 .env
 
 .vscode
+<<<<<<< HEAD
 *.DS_STORE%
+
+# nix
+result
+
+
