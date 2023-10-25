@@ -19,7 +19,6 @@ pachet permutat
 
 
 
-
 Alice , shuffle and encrypt deck  ---- shuffled deck encrypted by alice
 
 Bob 
